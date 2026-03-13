@@ -67,9 +67,14 @@ const I18N = {
     stat_fragments: "지도 조각",
     stat_sigils: "시질",
     stat_blackout: "정전",
+    stat_hunter: "술래 유형",
+    stat_boon: "가호",
+    stat_omen: "흉조",
     meta_runs: "플레이 수",
     meta_escapes: "탈출 수",
     meta_bestTime: "최고 시간",
+    meta_shards: "잔재",
+    meta_unlock: "기록 단계",
     room_none: "없음",
     movement_wasd: "키보드",
     movement_click: "포인트",
@@ -125,9 +130,14 @@ const I18N = {
     stat_fragments: "Fragments",
     stat_sigils: "Sigils",
     stat_blackout: "Blackout",
+    stat_hunter: "Hunter",
+    stat_boon: "Boon",
+    stat_omen: "Omen",
     meta_runs: "Runs",
     meta_escapes: "Escapes",
     meta_bestTime: "Best time",
+    meta_shards: "Shards",
+    meta_unlock: "Archive tier",
     room_none: "None",
     movement_wasd: "Keyboard",
     movement_click: "Point",
@@ -154,6 +164,20 @@ function t(key) {
   return (I18N[state.lang] && I18N[state.lang][key]) || I18N.en[key] || key;
 }
 
+function langText(ko, en) {
+  return state.lang === "ko" ? ko : en;
+}
+
+function localize(entry) {
+  if (!entry) {
+    return "";
+  }
+  if (typeof entry === "string") {
+    return entry;
+  }
+  return entry[state.lang] || entry.en || "";
+}
+
 const CONFIG = {
   player: {
     maxHp: 100,
@@ -172,9 +196,18 @@ const CONFIG = {
   summon: {
     baseCost: 60,
     slotCostStep: 18,
-    sentinelChance: 0.38,
-    roverChance: 0.7,
-    huskChance: 0.9,
+    playerWeights: {
+      sentinel: 38,
+      rover: 30,
+      husk: 22,
+      relic: 10,
+    },
+    hiderWeights: {
+      sentinel: 46,
+      rover: 27,
+      husk: 21,
+      relic: 6,
+    },
   },
   intel: {
     baseCost: 80,
@@ -219,14 +252,188 @@ const CONFIG = {
     interceptDoorRange: 180,
     defendDoorRange: 220,
   },
+  hider: {
+    goldGainMultiplier: 0.58,
+    decisionMin: 3.6,
+    decisionMax: 6.4,
+    baseUnitCap: 2,
+  },
   infected: {
     playerDamage: 8,
     doorDamage: 6,
+  },
+  meta: {
+    shardEscapeBase: 4,
+    shardFailBase: 2,
+    tierThresholds: [0, 4, 9, 16],
   },
   feedback: {
     shakeDecayPerSecond: 4.2,
   },
 };
+
+const HUNTER_ARCHETYPES = [
+  {
+    id: "stalker",
+    label: { ko: "그림자 추적자", en: "Shadow Stalker" },
+    description: {
+      ko: "조용하지만 빠르다. 플레이어를 집요하게 압박한다.",
+      en: "Silent but fast. Leans hard into player pressure.",
+    },
+    mods: {
+      hunterSpeedMultiplier: 1.16,
+      hunterHpMultiplier: 0.94,
+      hunterPlayerDamageMultiplier: 1.18,
+    },
+  },
+  {
+    id: "juggernaut",
+    label: { ko: "공성 괴수", en: "Siege Juggernaut" },
+    description: {
+      ko: "느리지만 문을 찢는다. 버티기만 해도 부담이 커진다.",
+      en: "Slower, but brutal against doors and fortifications.",
+    },
+    mods: {
+      hunterSpeedMultiplier: 0.92,
+      hunterHpMultiplier: 1.34,
+      hunterDoorDamageMultiplier: 1.3,
+    },
+  },
+  {
+    id: "brood",
+    label: { ko: "감염 번식체", en: "Brood Host" },
+    description: {
+      ko: "감염체 압박을 키우며 복도를 장악한다.",
+      en: "Amplifies infected pressure across the run.",
+    },
+    mods: {
+      infectedSpeedMultiplier: 1.08,
+      infectedHpMultiplier: 1.14,
+      blackoutSpawnBonus: 1,
+    },
+  },
+  {
+    id: "warden",
+    label: { ko: "정전 집행관", en: "Blackout Warden" },
+    description: {
+      ko: "정전을 더 자주 만들고 발전기 수리를 힘들게 한다.",
+      en: "Accelerates blackout cycles and punishes repairs.",
+    },
+    mods: {
+      blackoutIntervalMultiplier: 0.86,
+      repairDurationMultiplier: 1.18,
+      hunterSpeedMultiplier: 1.05,
+      hunterDoorDamageMultiplier: 1.08,
+    },
+  },
+];
+
+const RUN_BOONS = [
+  {
+    id: "windfall",
+    label: { ko: "비밀 자금", en: "Hidden Windfall" },
+    description: {
+      ko: "시작 자금이 늘고 침대 수익이 좋아진다.",
+      en: "More starting gold and stronger bed income.",
+    },
+    mods: {
+      startingGoldBonus: 70,
+      goldGainMultiplier: 1.14,
+    },
+  },
+  {
+    id: "steadyCurrent",
+    label: { ko: "안정 전류", en: "Steady Current" },
+    description: {
+      ko: "정전이 늦어지고 발전기 수리가 빨라진다.",
+      en: "Blackouts come later and repairs are faster.",
+    },
+    mods: {
+      blackoutIntervalMultiplier: 1.24,
+      repairDurationMultiplier: 0.82,
+    },
+  },
+  {
+    id: "ritualClarity",
+    label: { ko: "의식 명료", en: "Ritual Clarity" },
+    description: {
+      ko: "소환과 정보 구매가 저렴해진다.",
+      en: "Summons and intel are cheaper.",
+    },
+    mods: {
+      summonCostMultiplier: 0.9,
+      intelCostMultiplier: 0.82,
+      playerRelicWeightBonus: 5,
+    },
+  },
+  {
+    id: "saltCircle",
+    label: { ko: "소금 결계", en: "Salt Circle" },
+    description: {
+      ko: "변이가 늦어지고 감염체가 둔해진다.",
+      en: "Mutations delay and infected slow down.",
+    },
+    mods: {
+      mutationThresholdMultiplier: 1.2,
+      infectedSpeedMultiplier: 0.88,
+      playerMaxHpBonus: 8,
+    },
+  },
+];
+
+const RUN_OMENS = [
+  {
+    id: "thinWalls",
+    label: { ko: "얇은 벽", en: "Thin Walls" },
+    description: {
+      ko: "방이 더 빨리 찢어지고 균열이 자주 열린다.",
+      en: "Breaches trigger earlier and recur faster.",
+    },
+    mods: {
+      mutationThresholdMultiplier: 0.74,
+      breachIntervalMultiplier: 0.8,
+    },
+  },
+  {
+    id: "feedingHour",
+    label: { ko: "포식 시간", en: "Feeding Hour" },
+    description: {
+      ko: "감염체가 빨라지고 정전 때 더 많이 쏟아진다.",
+      en: "Infected move faster and surge harder in blackouts.",
+    },
+    mods: {
+      infectedSpeedMultiplier: 1.2,
+      infectedDamageMultiplier: 1.14,
+      blackoutSpawnBonus: 1,
+    },
+  },
+  {
+    id: "bloodScent",
+    label: { ko: "피 냄새", en: "Blood Scent" },
+    description: {
+      ko: "술래가 플레이어 방에 더 집착한다.",
+      en: "The hunter commits harder to the player's room.",
+    },
+    mods: {
+      hunterSpeedMultiplier: 1.08,
+      hunterPlayerDamageMultiplier: 1.12,
+      playerAggroBonus: 12,
+    },
+  },
+  {
+    id: "deadSignal",
+    label: { ko: "죽은 신호", en: "Dead Signal" },
+    description: {
+      ko: "정보 단말이 불안정하고 레이더가 짧아진다.",
+      en: "Intel is pricier and radar windows shrink.",
+    },
+    mods: {
+      intelCostMultiplier: 1.18,
+      radarDurationMultiplier: 0.72,
+      compassDurationMultiplier: 0.82,
+    },
+  },
+];
 
 const keys = new Set();
 const state = {
@@ -269,6 +476,135 @@ const colors = {
   relic: "#e4b8ff",
   husk: "#8f6f56",
 };
+
+function pickOne(list) {
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+function computeUnlockTier(shards) {
+  let tier = 0;
+  for (let index = 0; index < CONFIG.meta.tierThresholds.length; index += 1) {
+    if (shards >= CONFIG.meta.tierThresholds[index]) {
+      tier = index;
+    }
+  }
+  return tier;
+}
+
+function getMetaBonuses(meta) {
+  const tier = computeUnlockTier(meta.shards || 0);
+  return {
+    tier,
+    startingGoldBonus: [0, 30, 65, 110][tier] || 0,
+    playerMaxHpBonus: [0, 0, 12, 24][tier] || 0,
+    summonCostMultiplier: [1, 1, 0.94, 0.88][tier] || 1,
+    intelCostMultiplier: [1, 1, 0.96, 0.9][tier] || 1,
+    repairDurationMultiplier: [1, 1, 0.94, 0.86][tier] || 1,
+    goldGainMultiplier: [1, 1.04, 1.08, 1.12][tier] || 1,
+    playerRelicWeightBonus: [0, 0, 2, 4][tier] || 0,
+    hiderUnitCapBonus: [0, 0, 1, 1][tier] || 0,
+  };
+}
+
+function combineRunModifiers(...modifierSets) {
+  const combined = {
+    startingGoldBonus: 0,
+    goldGainMultiplier: 1,
+    summonCostMultiplier: 1,
+    intelCostMultiplier: 1,
+    repairDurationMultiplier: 1,
+    blackoutIntervalMultiplier: 1,
+    radarDurationMultiplier: 1,
+    compassDurationMultiplier: 1,
+    mutationThresholdMultiplier: 1,
+    mutationPressureMultiplier: 1,
+    breachIntervalMultiplier: 1,
+    playerMaxHpBonus: 0,
+    hunterSpeedMultiplier: 1,
+    hunterDamageMultiplier: 1,
+    hunterPlayerDamageMultiplier: 1,
+    hunterDoorDamageMultiplier: 1,
+    hunterHpMultiplier: 1,
+    infectedSpeedMultiplier: 1,
+    infectedDamageMultiplier: 1,
+    infectedHpMultiplier: 1,
+    blackoutSpawnBonus: 0,
+    playerRelicWeightBonus: 0,
+    playerAggroBonus: 0,
+    hiderGoldMultiplier: 1,
+    hiderUnitCapBonus: 0,
+  };
+  const additive = new Set([
+    "startingGoldBonus",
+    "playerMaxHpBonus",
+    "blackoutSpawnBonus",
+    "playerRelicWeightBonus",
+    "playerAggroBonus",
+    "hiderUnitCapBonus",
+  ]);
+
+  for (const source of modifierSets) {
+    if (!source) {
+      continue;
+    }
+    for (const [key, value] of Object.entries(source)) {
+      if (value === undefined) {
+        continue;
+      }
+      if (additive.has(key)) {
+        combined[key] += value;
+      } else {
+        combined[key] *= value;
+      }
+    }
+  }
+  return combined;
+}
+
+function createRunProfile(metaBonuses) {
+  const hunter = pickOne(HUNTER_ARCHETYPES);
+  const boon = pickOne(RUN_BOONS);
+  const omen = pickOne(RUN_OMENS);
+  return {
+    hunter,
+    boon,
+    omen,
+    modifiers: combineRunModifiers(metaBonuses, hunter.mods, boon.mods, omen.mods),
+  };
+}
+
+function getUnlockSummary(meta) {
+  const tier = computeUnlockTier(meta.shards || 0);
+  const summaries = [
+    { ko: "T0 기본", en: "T0 Base" },
+    { ko: "T1 시작 골드 보정", en: "T1 Bonus start gold" },
+    { ko: "T2 체력 + 비용 할인", en: "T2 HP + cost cuts" },
+    { ko: "T3 상위 기록 보정", en: "T3 advanced archive" },
+  ];
+  return localize(summaries[tier] || summaries[0]);
+}
+
+function announceRunSetup() {
+  pushLog(langText(`술래 유형: ${localize(game.runProfile.hunter.label)}`, `Hunter archetype: ${localize(game.runProfile.hunter.label)}`));
+  pushLog(
+    langText(
+      `가호: ${localize(game.runProfile.boon.label)} / 흉조: ${localize(game.runProfile.omen.label)}`,
+      `Boon: ${localize(game.runProfile.boon.label)} / Omen: ${localize(game.runProfile.omen.label)}`,
+    ),
+  );
+  if (game.metaBonuses.tier > 0) {
+    pushLog(
+      langText(
+        `기록 보정 적용: ${getUnlockSummary(state.meta)}`,
+        `Archive bonus active: ${getUnlockSummary(state.meta)}`,
+      ),
+    );
+  }
+}
+
+function rollBlackoutTimer(profile = game.runProfile) {
+  return randomRange(CONFIG.blackout.minInterval, CONFIG.blackout.maxInterval) * profile.modifiers.blackoutIntervalMultiplier;
+}
 
 const world = buildWorld();
 let game = createGame();
@@ -413,6 +749,9 @@ function createRoom(id, label, x, y, w, h, doorCenterX, doorY) {
 }
 
 function createGame() {
+  const metaBonuses = getMetaBonuses(state.meta);
+  const runProfile = createRunProfile(metaBonuses);
+
   for (const room of world.rooms) {
     room.owner = null;
     room.occupied = false;
@@ -438,8 +777,8 @@ function createGame() {
     x: 590,
     y: 370,
     radius: 12,
-    hp: CONFIG.player.maxHp,
-    maxHp: CONFIG.player.maxHp,
+    hp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
+    maxHp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
     speed: CONFIG.player.speed,
     roomId: null,
     ownedRoomId: null,
@@ -452,7 +791,7 @@ function createGame() {
     x: 590,
     y: 310,
     radius: 16,
-    hp: CONFIG.hunter.baseHp + CONFIG.hunter.hpPerLevel,
+    hp: (CONFIG.hunter.baseHp + CONFIG.hunter.hpPerLevel) * runProfile.modifiers.hunterHpMultiplier,
     targetRoomId: null,
     targetX: 590,
     targetY: 370,
@@ -482,7 +821,12 @@ function createGame() {
         roomId: room.id,
         x: room.bed.x,
         y: room.bed.y,
+        radius: 11,
         alive: true,
+        gold: 60,
+        decisionTimer: randomRange(CONFIG.hider.decisionMin, CONFIG.hider.decisionMax),
+        unitCap: CONFIG.hider.baseUnitCap + runProfile.modifiers.hiderUnitCapBonus,
+        panic: 0,
       });
       room.aggro = 18;
     } else {
@@ -500,19 +844,21 @@ function createGame() {
     hiders,
     units: [],
     infected: [],
-    gold: CONFIG.economy.startingGold,
+    gold: CONFIG.economy.startingGold + runProfile.modifiers.startingGoldBonus,
     time: 0,
     radarTime: 0,
     compassTime: 0,
     fragments: 0,
     keycardsCollected: 0,
     blackoutActive: false,
-    blackoutTimer: randomRange(CONFIG.blackout.minInterval, CONFIG.blackout.maxInterval),
+    blackoutTimer: rollBlackoutTimer(runProfile),
     blackoutDuration: 0,
     mutationClock: 0,
     repairNoise: 0,
     intelNoise: 0,
     winFlash: 0,
+    runProfile,
+    metaBonuses,
   };
 }
 
@@ -526,7 +872,8 @@ function resetGame() {
   state.flash = null;
   state.outcomeText = "";
   game = createGame();
-  pushLog(state.lang === "ko" ? "런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요." : "Run reset. Claim a room and survive long enough to escape.");
+  pushLog(langText("런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요.", "Run reset. Claim a room and survive long enough to escape."));
+  announceRunSetup();
   renderHud();
 }
 
@@ -537,7 +884,12 @@ function startRun() {
   ensureAudio();
   state.titleVisible = false;
   titleOverlay.classList.add("hidden");
-  showBanner(t("start_banner_title"), t("start_banner_subtitle"), "cyan", 1.6);
+  showBanner(
+    localize(game.runProfile.hunter.label),
+    `${localize(game.runProfile.boon.label)} / ${localize(game.runProfile.omen.label)}`,
+    "cyan",
+    1.8,
+  );
   flashScreen("rgba(133, 216, 255, 0.18)", 0.34, 0.2);
 }
 
@@ -757,46 +1109,71 @@ function attemptReinforce() {
     return;
   }
 
-  const cost =
+  reinforceDoor(ownedRoom, "player");
+}
+
+function getReinforceCost() {
+  return (
     CONFIG.door.reinforceBaseCost +
-    Math.floor(game.time / CONFIG.door.reinforceTimeStep) * CONFIG.door.reinforceCostStep;
-  if (game.gold < cost) {
-    pushLog("Not enough gold to reinforce the door.");
-    playUiTone(220, 0.06, "sawtooth", 0.025);
-    return;
+    Math.floor(game.time / CONFIG.door.reinforceTimeStep) * CONFIG.door.reinforceCostStep
+  );
+}
+
+function reinforceDoor(room, actorType, hider = null) {
+  const cost = getReinforceCost();
+  const bankroll = actorType === "player" ? game.gold : hider?.gold || 0;
+  if (bankroll < cost) {
+    if (actorType === "player") {
+      pushLog(langText("문 강화를 하기엔 골드가 부족합니다.", "Not enough gold to reinforce the door."));
+      playUiTone(220, 0.06, "sawtooth", 0.025);
+    }
+    return false;
   }
 
-  addGold(-cost);
+  if (actorType === "player") {
+    addGold(-cost);
+  } else if (hider) {
+    hider.gold -= cost;
+  }
   const roll = Math.random();
   if (roll < CONFIG.door.successChance) {
-    ownedRoom.door.maxHp += 18;
-    ownedRoom.door.hp = Math.min(ownedRoom.door.maxHp, ownedRoom.door.hp + 60);
-    ownedRoom.door.broken = false;
-    ownedRoom.door.closed = true;
-    pushLog("Door reinforcement succeeded.");
-    pulseShake(0.8);
-    playUiTone(420, 0.08, "triangle", 0.04);
+    room.door.maxHp += actorType === "player" ? 18 : 14;
+    room.door.hp = Math.min(room.door.maxHp, room.door.hp + (actorType === "player" ? 60 : 48));
+    room.door.broken = false;
+    room.door.closed = true;
+    if (actorType === "player") {
+      pushLog(langText("문 강화에 성공했습니다.", "Door reinforcement succeeded."));
+      pulseShake(0.8);
+      playUiTone(420, 0.08, "triangle", 0.04);
+    }
   } else if (roll < CONFIG.door.criticalChance) {
-    ownedRoom.door.maxHp += 28;
-    ownedRoom.door.hp = Math.min(ownedRoom.door.maxHp, ownedRoom.door.hp + 90);
-    ownedRoom.door.thorns = true;
-    ownedRoom.door.closed = true;
-    pushLog("Critical reinforce. The door now reflects damage.");
-    pulseShake(1.2);
-    playUiTone(520, 0.1, "triangle", 0.05);
-    showBanner("Critical Reinforce", "The door rejects the dark.", "cyan", 1.1);
+    room.door.maxHp += actorType === "player" ? 28 : 22;
+    room.door.hp = Math.min(room.door.maxHp, room.door.hp + (actorType === "player" ? 90 : 64));
+    room.door.thorns = true;
+    room.door.closed = true;
+    if (actorType === "player") {
+      pushLog(langText("대성공. 문에 반사 피해가 생겼습니다.", "Critical reinforce. The door now reflects damage."));
+      pulseShake(1.2);
+      playUiTone(520, 0.1, "triangle", 0.05);
+      showBanner(langText("대성공 강화", "Critical Reinforce"), langText("문이 어둠을 튕겨냅니다.", "The door rejects the dark."), "cyan", 1.1);
+    }
   } else if (roll < CONFIG.door.curseChance) {
-    pushLog("Reinforcement failed. Gold burned for nothing.");
-    playUiTone(180, 0.08, "sawtooth", 0.03);
+    if (actorType === "player") {
+      pushLog(langText("강화 실패. 골드만 타버렸습니다.", "Reinforcement failed. Gold burned for nothing."));
+      playUiTone(180, 0.08, "sawtooth", 0.03);
+    }
   } else {
-    ownedRoom.door.maxHp += 44;
-    ownedRoom.door.hp = Math.min(ownedRoom.door.maxHp, ownedRoom.door.hp + 120);
-    ownedRoom.door.curse = true;
-    ownedRoom.aggro += 20;
-    pushLog("Cursed reinforce. Stronger door, louder presence.");
-    pulseShake(1.4);
-    playUiTone(160, 0.18, "sawtooth", 0.04);
+    room.door.maxHp += actorType === "player" ? 44 : 32;
+    room.door.hp = Math.min(room.door.maxHp, room.door.hp + (actorType === "player" ? 120 : 78));
+    room.door.curse = true;
+    room.aggro += 20;
+    if (actorType === "player") {
+      pushLog(langText("저주 강화. 문은 강해졌지만 존재감도 커졌습니다.", "Cursed reinforce. Stronger door, louder presence."));
+      pulseShake(1.4);
+      playUiTone(160, 0.18, "sawtooth", 0.04);
+    }
   }
+  return true;
 }
 
 function addGold(amount) {
@@ -811,10 +1188,10 @@ function claimRoom(room) {
   room.occupied = true;
   room.door.closed = true;
   room.door.broken = false;
-  room.aggro = 20;
+  room.aggro = 20 + game.runProfile.modifiers.playerAggroBonus;
   game.player.ownedRoomId = room.id;
-  pushLog(`${room.label} is now yours.`);
-  showBanner("Room Claimed", room.label, "cyan", 1.4);
+  pushLog(langText(`${room.label}을 점거했습니다.`, `${room.label} is now yours.`));
+  showBanner(langText("방 점거", "Room Claimed"), room.label, "cyan", 1.4);
 }
 
 function toggleDoor(room) {
@@ -822,80 +1199,17 @@ function toggleDoor(room) {
     return;
   }
   room.door.closed = !room.door.closed;
-  pushLog(room.door.closed ? "Door sealed." : "Door opened.");
+  pushLog(room.door.closed ? langText("문을 봉쇄했습니다.", "Door sealed.") : langText("문을 열었습니다.", "Door opened."));
 }
 
 function performSummon(room) {
-  const cost = CONFIG.summon.baseCost + roomUnits(room.id).length * CONFIG.summon.slotCostStep;
-  if (game.gold < cost) {
-    pushLog("Not enough gold for a summon.");
-    playUiTone(220, 0.06, "sawtooth", 0.025);
-    return;
-  }
-
-  const freeSpot = room.spawnPoints.find((spot) =>
-    !game.units.some((unit) => unit.roomId === room.id && distance(unit, spot) < 30),
-  );
-
-  if (!freeSpot) {
-    pushLog("No free sigil slot in the room.");
-    return;
-  }
-
-  addGold(-cost);
-  const roll = Math.random();
-  let type = "sentinel";
-  if (roll < CONFIG.summon.sentinelChance) {
-    type = "sentinel";
-  } else if (roll < CONFIG.summon.roverChance) {
-    type = "rover";
-  } else if (roll < CONFIG.summon.huskChance) {
-    type = "husk";
-  } else {
-    type = "relic";
-  }
-
-  const unit = {
-    id: `unit-${state.nextUnitId++}`,
-    type,
-    role: type === "sentinel" ? "anchor" : type === "rover" ? "interceptor" : type === "relic" ? "ward" : "volatile",
-    roomId: room.id,
-    x: freeSpot.x,
-    y: freeSpot.y,
-    cooldown: randomRange(0.1, 0.7),
-    life: type === "husk" ? 9 : 999,
-    angle: randomRange(0, Math.PI * 2),
-    homeX: freeSpot.x,
-    homeY: freeSpot.y,
-  };
-
-  game.units.push(unit);
-  const names = {
-    sentinel: "Sentinel drawn.",
-    rover: "Rover spirit drawn.",
-    husk: "A brittle husk answered the call.",
-    relic: "Relic apparition drawn. Rare.",
-  };
-  pushLog(names[type]);
-  pulseShake(type === "relic" ? 1.4 : 0.45);
-  playUiTone(type === "relic" ? 760 : type === "husk" ? 190 : 460, 0.1, type === "husk" ? "sawtooth" : "triangle", 0.04);
-  if (type === "relic") {
-    showBanner("Legendary Draw", "A relic apparition answers the ritual.", "violet", 1.6);
-    flashScreen("rgba(206, 136, 255, 0.22)", 0.45, 0.22);
-  } else if (type === "husk") {
-    showBanner("Bad Pull", "The ritual spat out a brittle husk.", "amber", 1.1);
-  } else {
-    showBanner("Summon Complete", names[type], type === "rover" ? "cyan" : "gold", 0.9);
-  }
+  summonUnitFor(room, "player");
 }
 
 function buyIntel(room) {
-  const cost =
-    CONFIG.intel.baseCost +
-    game.fragments * CONFIG.intel.fragmentCostStep +
-    Math.floor(game.time * CONFIG.intel.timeInflation);
+  const cost = getIntelCost();
   if (game.gold < cost) {
-    pushLog("Not enough gold to buy intel.");
+    pushLog(langText("정보를 사기엔 골드가 부족합니다.", "Not enough gold to buy intel."));
     playUiTone(220, 0.06, "sawtooth", 0.025);
     return;
   }
@@ -904,24 +1218,24 @@ function buyIntel(room) {
   const roll = Math.random();
   if (roll < CONFIG.intel.fragmentChance) {
     game.fragments = Math.min(CONFIG.intel.maxFragments, game.fragments + 1);
-    pushLog(`Map fragment recovered (${game.fragments}/6).`);
+    pushLog(langText(`지도 조각 확보 (${game.fragments}/6).`, `Map fragment recovered (${game.fragments}/6).`));
     playUiTone(540, 0.08, "triangle", 0.04);
-    showBanner("Map Fragment", `Recovered ${game.fragments} of 6.`, "cyan", 1);
+    showBanner(langText("지도 조각", "Map Fragment"), langText(`${game.fragments} / 6 확보`, `Recovered ${game.fragments} of 6.`), "cyan", 1);
   } else if (roll < CONFIG.intel.radarChance) {
-    game.radarTime = Math.max(game.radarTime, 12);
-    pushLog("Radar pulse online for 12 seconds.");
+    game.radarTime = Math.max(game.radarTime, 12 * game.runProfile.modifiers.radarDurationMultiplier);
+    pushLog(langText("레이더 펄스가 짧게 열렸습니다.", "Radar pulse online."));
     playUiTone(470, 0.08, "square", 0.035);
-    showBanner("Radar Pulse", "Enemy traces exposed.", "cyan", 0.95);
+    showBanner(langText("레이더 펄스", "Radar Pulse"), langText("적 흔적이 노출되었습니다.", "Enemy traces exposed."), "cyan", 0.95);
   } else if (roll < CONFIG.intel.failChance) {
     game.intelNoise = 15;
-    pushLog("Static burst. No useful intel.");
+    pushLog(langText("노이즈 폭주. 쓸 만한 정보가 없습니다.", "Static burst. No useful intel."));
     playUiTone(140, 0.12, "sawtooth", 0.035);
-    showBanner("Signal Lost", "Static swallowed the feed.", "crimson", 0.95);
+    showBanner(langText("신호 손실", "Signal Lost"), langText("노이즈가 피드를 먹어버렸습니다.", "Static swallowed the feed."), "crimson", 0.95);
   } else {
-    game.compassTime = Math.max(game.compassTime, 14);
-    pushLog("The terminal points toward the escape route.");
+    game.compassTime = Math.max(game.compassTime, 14 * game.runProfile.modifiers.compassDurationMultiplier);
+    pushLog(langText("단말이 탈출 방향을 가리킵니다.", "The terminal points toward the escape route."));
     playUiTone(680, 0.12, "triangle", 0.05);
-    showBanner("Exit Vector", "A hidden route flickers into view.", "gold", 1.2);
+    showBanner(langText("탈출 벡터", "Exit Vector"), langText("숨겨진 경로가 번쩍입니다.", "A hidden route flickers into view."), "gold", 1.2);
     flashScreen("rgba(255, 211, 107, 0.18)", 0.35, 0.18);
   }
 
@@ -937,12 +1251,131 @@ function buyIntel(room) {
   }
 }
 
-function roomUnits(roomId) {
-  return game.units.filter((unit) => unit.roomId === roomId);
+function getSummonCost(room, actorType = "player") {
+  const occupiedSlots = roomUnits(room.id).length;
+  const rawCost = CONFIG.summon.baseCost + occupiedSlots * CONFIG.summon.slotCostStep;
+  const multiplier = actorType === "player" ? game.runProfile.modifiers.summonCostMultiplier : 1;
+  return Math.round(rawCost * multiplier);
+}
+
+function getIntelCost() {
+  const rawCost =
+    CONFIG.intel.baseCost +
+    game.fragments * CONFIG.intel.fragmentCostStep +
+    Math.floor(game.time * CONFIG.intel.timeInflation);
+  return Math.round(rawCost * game.runProfile.modifiers.intelCostMultiplier);
+}
+
+function roomUnits(roomId, ownerId = null) {
+  return game.units.filter((unit) => unit.roomId === roomId && (!ownerId || unit.ownerId === ownerId));
+}
+
+function weightedDraw(table) {
+  const total = Object.values(table).reduce((sum, value) => sum + value, 0);
+  let roll = Math.random() * total;
+  for (const [key, value] of Object.entries(table)) {
+    roll -= value;
+    if (roll <= 0) {
+      return key;
+    }
+  }
+  return Object.keys(table)[0];
+}
+
+function rollSummonType(actorType) {
+  const baseTable =
+    actorType === "player"
+      ? { ...CONFIG.summon.playerWeights }
+      : { ...CONFIG.summon.hiderWeights };
+  if (actorType === "player") {
+    baseTable.relic += game.runProfile.modifiers.playerRelicWeightBonus;
+    baseTable.husk = Math.max(6, baseTable.husk - Math.floor(game.runProfile.modifiers.playerRelicWeightBonus / 2));
+  }
+  return weightedDraw(baseTable);
+}
+
+function createUnitRecord(room, ownerId, type, spawnPoint) {
+  return {
+    id: `unit-${state.nextUnitId++}`,
+    ownerId,
+    type,
+    role: type === "sentinel" ? "anchor" : type === "rover" ? "interceptor" : type === "relic" ? "ward" : "volatile",
+    roomId: room.id,
+    x: spawnPoint.x,
+    y: spawnPoint.y,
+    cooldown: randomRange(0.1, 0.7),
+    life: type === "husk" ? 9 : 999,
+    angle: randomRange(0, Math.PI * 2),
+    homeX: spawnPoint.x,
+    homeY: spawnPoint.y,
+  };
+}
+
+function summonUnitFor(room, actorType, hider = null) {
+  const cost = getSummonCost(room, actorType);
+  const bankroll = actorType === "player" ? game.gold : hider?.gold || 0;
+  if (bankroll < cost) {
+    if (actorType === "player") {
+      pushLog(langText("소환을 하기엔 골드가 부족합니다.", "Not enough gold for a summon."));
+      playUiTone(220, 0.06, "sawtooth", 0.025);
+    }
+    return false;
+  }
+
+  const freeSpot = room.spawnPoints.find(
+    (spot) => !game.units.some((unit) => unit.roomId === room.id && distance(unit, spot) < 30),
+  );
+
+  if (!freeSpot) {
+    if (actorType === "player") {
+      pushLog(langText("방 안의 소환 슬롯이 전부 찼습니다.", "No free sigil slot in the room."));
+    }
+    return false;
+  }
+
+  if (actorType === "player") {
+    addGold(-cost);
+  } else if (hider) {
+    hider.gold -= cost;
+  }
+
+  const type = rollSummonType(actorType);
+  const ownerId = actorType === "player" ? "player" : hider.id;
+  game.units.push(createUnitRecord(room, ownerId, type, freeSpot));
+
+  if (actorType !== "player") {
+    if (type === "relic") {
+      pushLog(langText(`${room.label}에서 희귀 수호자가 나왔습니다.`, `A rare guardian emerged in ${room.label}.`));
+    }
+    return true;
+  }
+
+  const names = {
+    sentinel: langText("센티널 소환.", "Sentinel drawn."),
+    rover: langText("로버 영체 소환.", "Rover spirit drawn."),
+    husk: langText("부서지기 쉬운 껍데기가 응답했습니다.", "A brittle husk answered the call."),
+    relic: langText("유물 환영 소환. 희귀.", "Relic apparition drawn. Rare."),
+  };
+  pushLog(names[type]);
+  pulseShake(type === "relic" ? 1.4 : 0.45);
+  playUiTone(type === "relic" ? 760 : type === "husk" ? 190 : 460, 0.1, type === "husk" ? "sawtooth" : "triangle", 0.04);
+  if (type === "relic") {
+    showBanner(langText("전설 뽑기", "Legendary Draw"), langText("유물 환영이 의식에 응답합니다.", "A relic apparition answers the ritual."), "violet", 1.6);
+    flashScreen("rgba(206, 136, 255, 0.22)", 0.45, 0.22);
+  } else if (type === "husk") {
+    showBanner(langText("꽝", "Bad Pull"), langText("의식이 부서질 껍데기만 뱉었습니다.", "The ritual spat out a brittle husk."), "amber", 1.1);
+  } else {
+    showBanner(langText("소환 완료", "Summon Complete"), names[type], type === "rover" ? "cyan" : "gold", 0.9);
+  }
+  return true;
 }
 
 function getOwnedRoom() {
   return world.rooms.find((room) => room.id === game.player.ownedRoomId) || null;
+}
+
+function getRoomById(roomId) {
+  return world.rooms.find((room) => room.id === roomId) || null;
 }
 
 function getRoomByOwner(ownerId) {
@@ -998,10 +1431,11 @@ function escapeRun() {
   state.meta.runs += 1;
   state.meta.escapes += 1;
   state.meta.bestTime = Math.max(state.meta.bestTime, game.time);
+  awardRunRewards(true);
   saveMeta(state.meta);
-  pushLog("Escape successful. The ward lost you.");
+  pushLog(langText("탈출 성공. 구역이 당신을 놓쳤습니다.", "Escape successful. The ward lost you."));
   state.outcomeText = t("outcome_escape");
-  showBanner("Escape Complete", "You slipped beyond the service gate.", "cyan", 2.3);
+  showBanner(langText("탈출 완료", "Escape Complete"), langText("서비스 게이트 너머로 미끄러져 빠져나왔습니다.", "You slipped beyond the service gate."), "cyan", 2.3);
   flashScreen("rgba(133, 216, 255, 0.24)", 0.55, 0.3);
 }
 
@@ -1012,12 +1446,13 @@ function failRun(reason) {
   game.phase = "failed";
   state.meta.runs += 1;
   state.meta.bestTime = Math.max(state.meta.bestTime, game.time);
+  awardRunRewards(false);
   saveMeta(state.meta);
   pushLog(reason);
   state.outcomeText = reason;
   pulseShake(3.2);
   playUiTone(120, 0.5, "sawtooth", 0.05);
-  showBanner("Run Failed", reason, "crimson", 2.2);
+  showBanner(langText("런 실패", "Run Failed"), reason, "crimson", 2.2);
   flashScreen("rgba(255, 72, 118, 0.28)", 0.55, 0.28);
 }
 
@@ -1049,13 +1484,18 @@ function update(dt) {
   updateEconomy(dt);
   updateBlackout(dt);
   updateMutation(dt);
+  updateHiders(dt);
   updateUnits(dt);
   updateHunter(dt);
   updateInfected(dt);
   collectKeycards();
 
   if (game.player.hp <= 0) {
-    failRun(game.player.lastDamageSource === "infected" ? "You were torn apart by infected." : "You were taken by the hunter.");
+    failRun(
+      game.player.lastDamageSource === "infected"
+        ? langText("감염체에게 찢겼습니다.", "You were torn apart by infected.")
+        : langText("술래에게 붙잡혔습니다.", "You were taken by the hunter."),
+    );
   }
 }
 
@@ -1099,7 +1539,7 @@ function updatePlayer(dt) {
 
   if (game.blackoutActive && distance(player, world.generator) < 46 && keys.has("e")) {
     player.holdingRepair += dt;
-    if (player.holdingRepair >= 2.2) {
+    if (player.holdingRepair >= 2.2 * game.runProfile.modifiers.repairDurationMultiplier) {
       repairGenerator();
     }
   } else {
@@ -1114,8 +1554,72 @@ function updateEconomy(dt) {
   }
 
   if (distance(game.player, ownedRoom.bed) < 34) {
-    addGold(CONFIG.economy.goldPerSecondOnBed * dt);
+    addGold(CONFIG.economy.goldPerSecondOnBed * game.runProfile.modifiers.goldGainMultiplier * dt);
     game.player.hp = Math.min(game.player.maxHp, game.player.hp + CONFIG.player.healPerSecondOnBed * dt);
+  }
+}
+
+function updateHiders(dt) {
+  for (const hider of game.hiders) {
+    if (!hider.alive) {
+      continue;
+    }
+
+    const room = getRoomById(hider.roomId);
+    if (!room || room.owner !== hider.id) {
+      continue;
+    }
+
+    const localThreats = [game.hunter, ...game.infected].filter(
+      (enemy) =>
+        pointInRect(enemy.x, enemy.y, room) ||
+        distance(enemy, { x: room.door.centerX, y: room.door.centerY }) < 120,
+    ).length;
+
+    const safeIncome =
+      CONFIG.economy.goldPerSecondOnBed *
+      CONFIG.hider.goldGainMultiplier *
+      game.runProfile.modifiers.hiderGoldMultiplier;
+    hider.gold += safeIncome * dt * (localThreats > 0 || game.blackoutActive ? 0.18 : 1);
+    hider.panic = Math.max(0, hider.panic - dt);
+
+    const retreatPoint =
+      localThreats > 0
+        ? { x: room.x + 34, y: room.y + room.h - 34 }
+        : hider.gold > getIntelCost() * 0.75
+          ? room.terminal
+          : room.bed;
+    moveTowardTarget(hider, retreatPoint.x, retreatPoint.y, dt * 66);
+
+    hider.decisionTimer -= dt;
+    if (hider.decisionTimer > 0) {
+      continue;
+    }
+
+    hider.decisionTimer = randomRange(CONFIG.hider.decisionMin, CONFIG.hider.decisionMax);
+
+    if (room.door.hp < room.door.maxHp * 0.72 && hider.gold >= getReinforceCost()) {
+      if (reinforceDoor(room, "hider", hider)) {
+        continue;
+      }
+    }
+
+    const ownedUnits = roomUnits(room.id, hider.id).length;
+    const shouldSummon =
+      ownedUnits < hider.unitCap &&
+      hider.gold >= getSummonCost(room, "hider") &&
+      (localThreats > 0 || Math.random() < 0.72);
+
+    if (shouldSummon) {
+      summonUnitFor(room, "hider", hider);
+      continue;
+    }
+
+    if (hider.gold >= getIntelCost() * 0.8 && Math.random() < 0.22) {
+      room.aggro += 2;
+      hider.gold -= getIntelCost() * 0.28;
+      pushLog(langText(`${room.label}의 생존자가 단말을 뒤졌습니다.`, `${room.label}'s hider rifled through the terminal.`));
+    }
   }
 }
 
@@ -1124,19 +1628,19 @@ function updateBlackout(dt) {
   if (!game.blackoutActive && game.blackoutTimer <= 0) {
     game.blackoutActive = true;
     game.blackoutDuration = 0;
-    pushLog("Blackout. The whole ward goes dark.");
+    pushLog(langText("정전. 구역 전체가 어두워졌습니다.", "Blackout. The whole ward goes dark."));
     pulseShake(2.2);
     playUiTone(90, 0.4, "sawtooth", 0.05);
-    showBanner("Blackout", "All active defenses are offline.", "crimson", 1.6);
+    showBanner(langText("정전", "Blackout"), langText("활성 방어 장치가 전부 멎었습니다.", "All active defenses are offline."), "crimson", 1.6);
     flashScreen("rgba(255, 86, 128, 0.18)", 0.45, 0.18);
   }
 
   if (game.blackoutActive) {
     game.blackoutDuration += dt;
     if (game.blackoutDuration > CONFIG.blackout.spawnAtSeconds) {
-      spawnInfectedAt(world.generator.x, world.generator.y + 20, 2);
+      spawnInfectedAt(world.generator.x, world.generator.y + 20, 2 + game.runProfile.modifiers.blackoutSpawnBonus);
       game.blackoutDuration = -999;
-      pushLog("The dark dragged more things out of the walls.");
+      pushLog(langText("어둠이 벽 속의 것들을 더 끌어냈습니다.", "The dark dragged more things out of the walls."));
       pulseShake(1.2);
     }
   }
@@ -1144,11 +1648,11 @@ function updateBlackout(dt) {
 
 function repairGenerator() {
   game.blackoutActive = false;
-  game.blackoutTimer = randomRange(CONFIG.blackout.minInterval, CONFIG.blackout.maxInterval);
+  game.blackoutTimer = rollBlackoutTimer();
   game.player.holdingRepair = 0;
-  pushLog("Generator repaired. Defenses are live again.");
+  pushLog(langText("발전기 복구 완료. 방어 장치가 다시 살아났습니다.", "Generator repaired. Defenses are live again."));
   playUiTone(420, 0.14, "triangle", 0.04);
-  showBanner("Power Restored", "The ward exhales for now.", "cyan", 1.4);
+  showBanner(langText("전력 복구", "Power Restored"), langText("구역이 잠깐 숨을 쉽니다.", "The ward exhales for now."), "cyan", 1.4);
 }
 
 function updateMutation(dt) {
@@ -1159,16 +1663,18 @@ function updateMutation(dt) {
 
   const inOwnedRoom = game.player.roomId === ownedRoom.id;
   if (inOwnedRoom) {
-    const pressure = 1 + Math.min(CONFIG.mutation.maxPressureBonus, game.gold / CONFIG.mutation.goldPressureDivisor);
+    const pressure =
+      (1 + Math.min(CONFIG.mutation.maxPressureBonus, game.gold / CONFIG.mutation.goldPressureDivisor)) *
+      game.runProfile.modifiers.mutationPressureMultiplier;
     game.mutationClock += dt * pressure;
   } else {
     game.mutationClock = Math.max(0, game.mutationClock - dt * 2);
   }
 
-  if (!ownedRoom.breach && game.mutationClock > CONFIG.mutation.triggerClock) {
+  if (!ownedRoom.breach && game.mutationClock > CONFIG.mutation.triggerClock * game.runProfile.modifiers.mutationThresholdMultiplier) {
     ownedRoom.breach = true;
     ownedRoom.aggro += 24;
-    pushLog("The room split open. Something found a side path.");
+    pushLog(langText("방이 찢어졌습니다. 무언가 옆길을 찾았습니다.", "The room split open. Something found a side path."));
     pulseShake(1.6);
     playUiTone(150, 0.22, "sawtooth", 0.04);
   }
@@ -1177,17 +1683,17 @@ function updateMutation(dt) {
     ownedRoom.breachTimer -= dt;
     if (ownedRoom.breachTimer <= 0) {
       spawnInfectedAt(ownedRoom.x + ownedRoom.w - 38, ownedRoom.y + ownedRoom.h / 2, 1);
-      ownedRoom.breachTimer = randomRange(14, 22);
-      pushLog("A breach spat another infected into your room.");
+      ownedRoom.breachTimer = randomRange(14, 22) * game.runProfile.modifiers.breachIntervalMultiplier;
+      pushLog(langText("균열이 또 다른 감염체를 방 안에 토해냈습니다.", "A breach spat another infected into your room."));
       pulseShake(1.1);
     }
   }
 }
 
 function updateUnits(dt) {
-  const ownedRoom = getOwnedRoom();
   for (let i = game.units.length - 1; i >= 0; i -= 1) {
     const unit = game.units[i];
+    const unitRoom = getRoomById(unit.roomId);
     unit.cooldown -= dt;
 
     if (unit.type === "husk") {
@@ -1203,7 +1709,7 @@ function updateUnits(dt) {
       continue;
     }
 
-    const localTarget = selectUnitTarget(unit, ownedRoom);
+    const localTarget = selectUnitTarget(unit, unitRoom);
     updateUnitPosition(unit, localTarget, dt);
 
     if (game.blackoutActive) {
@@ -1221,8 +1727,8 @@ function updateUnits(dt) {
     }
 
     const targetNearDoor =
-      ownedRoom &&
-      distance(target, { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY }) < CONFIG.ally.defendDoorRange;
+      unitRoom &&
+      distance(target, { x: unitRoom.door.centerX, y: unitRoom.door.centerY }) < CONFIG.ally.defendDoorRange;
     const damage = unit.type === "relic" ? 24 : unit.type === "rover" ? 13 : targetNearDoor ? 14 : 10;
     target.hp -= damage;
     spawnImpact(target.x, target.y, unit.type === "relic" ? "violet" : "cyan", unit.type === "relic" ? 1.35 : 0.85, 10);
@@ -1246,7 +1752,7 @@ function updateUnits(dt) {
     game.hunter.hp = hunterMaxHp();
     game.hunter.x = 590;
     game.hunter.y = 310;
-    pushLog("The hunter reformed in the hall.");
+    pushLog(langText("술래가 홀에서 다시 형체를 만들었습니다.", "The hunter reformed in the hall."));
     pulseShake(1.8);
     playUiTone(110, 0.28, "triangle", 0.035);
   }
@@ -1261,7 +1767,8 @@ function updateHunter(dt) {
     (CONFIG.hunter.baseSpeed +
       hunter.level * CONFIG.hunter.speedPerLevel +
       (game.blackoutActive ? CONFIG.hunter.blackoutSpeedBonus : 0)) *
-    modeModifiers.speed;
+    modeModifiers.speed *
+    game.runProfile.modifiers.hunterSpeedMultiplier;
   hunter.attackCooldown = Math.max(0, hunter.attackCooldown - dt);
   hunter.retargetTimer -= dt;
 
@@ -1276,7 +1783,7 @@ function updateHunter(dt) {
 }
 
 function hunterMaxHp() {
-  return CONFIG.hunter.baseHp + game.hunter.level * CONFIG.hunter.hpPerLevel;
+  return (CONFIG.hunter.baseHp + game.hunter.level * CONFIG.hunter.hpPerLevel) * game.runProfile.modifiers.hunterHpMultiplier;
 }
 
 function updateHunterMode(dt) {
@@ -1306,14 +1813,14 @@ function updateHunterMode(dt) {
   if (hunter.mode !== nextMode) {
     hunter.mode = nextMode;
     const labels = {
-      stalk: "The hunter goes quiet.",
-      siege: "The hunter braces to break the door.",
-      rush: "The hunter surges through the hall.",
-      enrage: "The hunter is enraged.",
+      stalk: langText("술래가 숨을 죽였습니다.", "The hunter goes quiet."),
+      siege: langText("술래가 문 파괴 태세를 잡았습니다.", "The hunter braces to break the door."),
+      rush: langText("술래가 복도를 가로질러 돌진합니다.", "The hunter surges through the hall."),
+      enrage: langText("술래가 광폭화했습니다.", "The hunter is enraged."),
     };
     pushLog(labels[nextMode]);
     if (nextMode === "enrage") {
-      showBanner(state.lang === "ko" ? "광폭화" : "Enrage", state.lang === "ko" ? "술래가 속도를 올립니다." : "The hunter accelerates.", "crimson", 1.2);
+      showBanner(langText("광폭화", "Enrage"), langText("술래가 속도를 올립니다.", "The hunter accelerates."), "crimson", 1.2);
     }
   }
   hunter.modeTimer = 4.5;
@@ -1339,6 +1846,7 @@ function retargetHunter() {
     if (room.id === ownedRoom?.id) {
       score += 18;
       score += game.mutationClock * 0.45;
+      score += game.runProfile.modifiers.playerAggroBonus;
     }
     if (room.breach) {
       score += 22;
@@ -1397,7 +1905,7 @@ function handleHunterDoorDamage() {
     game.hunter.attackCooldown = 1.6;
     game.hunter.x = room.x + room.w - 44;
     game.hunter.y = room.y + room.h / 2;
-    pushLog("The hunter slipped in through the breach.");
+    pushLog(langText("술래가 균열로 미끄러져 들어왔습니다.", "The hunter slipped in through the breach."));
     pulseShake(1.4);
     playUiTone(130, 0.18, "sawtooth", 0.04);
     spawnImpact(game.hunter.x, game.hunter.y, "crimson", 1.2, 14);
@@ -1416,7 +1924,11 @@ function handleHunterDoorDamage() {
   }
   const mode = hunterModeProfile();
   game.hunter.attackCooldown = 0.7 * mode.cooldown;
-  const damage = (CONFIG.hunter.baseDoorDamage + game.hunter.level * CONFIG.hunter.damagePerLevel) * mode.damage;
+  const damage =
+    (CONFIG.hunter.baseDoorDamage + game.hunter.level * CONFIG.hunter.damagePerLevel) *
+    mode.damage *
+    game.runProfile.modifiers.hunterDoorDamageMultiplier *
+    game.runProfile.modifiers.hunterDamageMultiplier;
   room.door.hp -= damage;
   spawnImpact(room.door.centerX, room.door.centerY, "crimson", 1.05, 12);
   if (room.door.thorns) {
@@ -1426,7 +1938,7 @@ function handleHunterDoorDamage() {
   if (room.door.hp <= 0) {
     room.door.broken = true;
     room.door.closed = false;
-    pushLog(`${room.label} door collapsed.`);
+    pushLog(langText(`${room.label} 문의 봉쇄가 무너졌습니다.`, `${room.label} door collapsed.`));
     pulseShake(1.7);
     playUiTone(170, 0.22, "sawtooth", 0.05);
   }
@@ -1442,7 +1954,11 @@ function handleHunterAttacks() {
     if (distance(game.hunter, game.player) < 24 && game.hunter.attackCooldown <= 0) {
       const mode = hunterModeProfile();
       game.hunter.attackCooldown = 0.65 * mode.cooldown;
-      game.player.hp -= (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) * mode.damage;
+      game.player.hp -=
+        (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) *
+        mode.damage *
+        game.runProfile.modifiers.hunterPlayerDamageMultiplier *
+        game.runProfile.modifiers.hunterDamageMultiplier;
       game.player.lastDamageSource = "hunter";
       pulseShake(1.25);
       playUiTone(150, 0.08, "square", 0.04);
@@ -1459,7 +1975,7 @@ function handleHunterAttacks() {
     room.owner = "infected";
     room.occupied = false;
     spawnInfectedAt(room.bed.x, room.bed.y, 3);
-    pushLog(`${room.label} fell. Another hider turned.`);
+    pushLog(langText(`${room.label}이 함락됐습니다. 또 한 명이 감염됐습니다.`, `${room.label} fell. Another hider turned.`));
     pulseShake(1.1);
   }
 }
@@ -1479,13 +1995,13 @@ function updateInfected(dt) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = 1.1;
-        ownedRoom.door.hp -= CONFIG.infected.doorDamage;
+        ownedRoom.door.hp -= CONFIG.infected.doorDamage * game.runProfile.modifiers.infectedDamageMultiplier;
         spawnImpact(ownedRoom.door.centerX, ownedRoom.door.centerY, "amber", 0.7, 8);
         if (ownedRoom.door.hp <= 0) {
           ownedRoom.door.hp = 0;
           ownedRoom.door.broken = true;
           ownedRoom.door.closed = false;
-          pushLog("Infected chewed through your door.");
+          pushLog(langText("감염체가 문을 씹어 뚫었습니다.", "Infected chewed through your door."));
           pulseShake(1.4);
           playUiTone(150, 0.16, "sawtooth", 0.04);
         }
@@ -1498,7 +2014,7 @@ function updateInfected(dt) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = 1;
-        game.player.hp -= CONFIG.infected.playerDamage;
+        game.player.hp -= CONFIG.infected.playerDamage * game.runProfile.modifiers.infectedDamageMultiplier;
         game.player.lastDamageSource = "infected";
         pulseShake(0.9);
         playUiTone(180, 0.06, "square", 0.03);
@@ -1535,15 +2051,15 @@ function collectKeycards() {
     if (distance(game.player, keycard) < 18) {
       keycard.collected = true;
       game.keycardsCollected += 1;
-      pushLog(`Recovered ${keycard.id}.`);
+      pushLog(langText(`${keycard.id} 확보.`, `Recovered ${keycard.id}.`));
       playUiTone(620, 0.12, "triangle", 0.045);
-      showBanner("Sigil Recovered", keycard.id, "gold", 1.15);
+      showBanner(langText("시질 회수", "Sigil Recovered"), keycard.id, "gold", 1.15);
       if (game.fragments >= 6 && game.keycardsCollected >= 2) {
         world.exitRoom.gate.closed = false;
-        pushLog("The service gate unlocked.");
+        pushLog(langText("서비스 게이트가 열렸습니다.", "The service gate unlocked."));
         pulseShake(2.1);
         playUiTone(760, 0.18, "triangle", 0.05);
-        showBanner("Gate Unlocked", "Run now or be buried here.", "gold", 1.6);
+        showBanner(langText("게이트 해금", "Gate Unlocked"), langText("지금 뛰지 않으면 여기 묻힙니다.", "Run now or be buried here."), "gold", 1.6);
         flashScreen("rgba(255, 211, 107, 0.24)", 0.48, 0.22);
       }
     }
@@ -1556,8 +2072,8 @@ function spawnInfectedAt(x, y, count) {
       x: x + randomRange(-18, 18),
       y: y + randomRange(-18, 18),
       radius: 11,
-      hp: 26,
-      speed: randomRange(72, 92),
+      hp: 26 * game.runProfile.modifiers.infectedHpMultiplier,
+      speed: randomRange(72, 92) * game.runProfile.modifiers.infectedSpeedMultiplier,
       attackCooldown: 0,
     });
   }
@@ -2089,7 +2605,7 @@ function drawHudMap() {
 
   ctx.fillStyle = "rgba(231, 239, 255, 0.82)";
   ctx.font = "700 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-  ctx.fillText("Map Fragments", panel.x + 16, panel.y + 24);
+  ctx.fillText(langText("지도 조각", "Map Fragments"), panel.x + 16, panel.y + 24);
 
   const mapScale = 0.2;
   const ox = panel.x + 12;
@@ -2138,7 +2654,7 @@ function drawHudMap() {
     ctx.lineTo(panel.x + panel.w - 34, panel.y + 54);
     ctx.stroke();
     ctx.fillStyle = "#ffd36b";
-    ctx.fillText("Exit", panel.x + panel.w - 58, panel.y + 72);
+    ctx.fillText(langText("탈출", "Exit"), panel.x + panel.w - 58, panel.y + 72);
   }
 }
 
@@ -2151,13 +2667,13 @@ function drawMessageOverlay() {
   ctx.textAlign = "center";
   ctx.fillStyle = game.phase === "escaped" ? "#8fe9c7" : "#ff8a8a";
   ctx.font = "700 52px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-  ctx.fillText(game.phase === "escaped" ? "You Escaped" : "Run Failed", WIDTH / 2, HEIGHT / 2 - 20);
+  ctx.fillText(game.phase === "escaped" ? langText("탈출 성공", "You Escaped") : langText("런 실패", "Run Failed"), WIDTH / 2, HEIGHT / 2 - 20);
   ctx.fillStyle = "#e7efe8";
   ctx.font = "700 20px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-  ctx.fillText(state.outcomeText || "Press Restart Run to begin again.", WIDTH / 2, HEIGHT / 2 + 18);
+  ctx.fillText(state.outcomeText || langText("다시 시작을 눌러 새 런을 시작하세요.", "Press Restart Run to begin again."), WIDTH / 2, HEIGHT / 2 + 18);
   ctx.font = "700 16px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
   ctx.fillStyle = "rgba(231, 239, 248, 0.78)";
-  ctx.fillText("Press Restart Run to begin again.", WIDTH / 2, HEIGHT / 2 + 50);
+  ctx.fillText(langText("다시 시작을 눌러 새 런을 시작하세요.", "Press Restart Run to begin again."), WIDTH / 2, HEIGHT / 2 + 50);
   ctx.textAlign = "left";
 }
 
@@ -2628,9 +3144,12 @@ function renderHud() {
     [t("stat_movement"), t(`movement_${state.movementMode}`), ""],
     [t("stat_admin"), state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
     [t("stat_room"), ownedRoom ? ownedRoom.label : t("room_none"), ""],
+    [t("stat_hunter"), localize(game.runProfile.hunter.label), "danger"],
+    [t("stat_boon"), localize(game.runProfile.boon.label), "gold"],
+    [t("stat_omen"), localize(game.runProfile.omen.label), "danger"],
     [t("stat_fragments"), `${game.fragments} / 6`, ""],
     [t("stat_sigils"), `${game.keycardsCollected} / 2`, ""],
-    [t("stat_blackout"), game.blackoutActive ? "ACTIVE" : `${Math.ceil(game.blackoutTimer)}s`, game.blackoutActive ? "danger" : ""],
+    [t("stat_blackout"), game.blackoutActive ? langText("활성", "ACTIVE") : `${Math.ceil(game.blackoutTimer)}s`, game.blackoutActive ? "danger" : ""],
   ];
 
   statsEl.innerHTML = stats
@@ -2644,6 +3163,8 @@ function renderHud() {
     [t("meta_runs"), String(state.meta.runs)],
     [t("meta_escapes"), String(state.meta.escapes)],
     [t("meta_bestTime"), formatTime(state.meta.bestTime)],
+    [t("meta_shards"), String(state.meta.shards)],
+    [t("meta_unlock"), getUnlockSummary(state.meta)],
   ];
 
   metaEl.innerHTML = metaRows
@@ -2709,20 +3230,43 @@ function randomRange(min, max) {
   return Math.random() * (max - min) + min;
 }
 
+function awardRunRewards(escaped) {
+  const beforeTier = computeUnlockTier(state.meta.shards || 0);
+  const timeBonus = Math.min(3, Math.floor(game.time / 75));
+  const shardsEarned = escaped
+    ? CONFIG.meta.shardEscapeBase + timeBonus
+    : CONFIG.meta.shardFailBase + Math.min(2, Math.floor(game.time / 90));
+  state.meta.shards = (state.meta.shards || 0) + shardsEarned;
+  state.meta.unlockTier = computeUnlockTier(state.meta.shards);
+  pushLog(langText(`잔재 ${shardsEarned}개를 확보했습니다.`, `Secured ${shardsEarned} shards.`));
+  if (state.meta.unlockTier > beforeTier) {
+    showBanner(
+      langText("기록 단계 상승", "Archive Upgraded"),
+      getUnlockSummary(state.meta),
+      "gold",
+      1.8,
+    );
+    pushLog(langText(`새 기록 보정 해금: ${getUnlockSummary(state.meta)}`, `New archive perk unlocked: ${getUnlockSummary(state.meta)}`));
+  }
+}
+
 function loadMeta() {
   try {
     const raw = localStorage.getItem("night-shift-escape-meta");
     if (!raw) {
-      return { runs: 0, escapes: 0, bestTime: 0 };
+      return { runs: 0, escapes: 0, bestTime: 0, shards: 0, unlockTier: 0 };
     }
     const parsed = JSON.parse(raw);
+    const shards = parsed.shards || 0;
     return {
       runs: parsed.runs || 0,
       escapes: parsed.escapes || 0,
       bestTime: parsed.bestTime || 0,
+      shards,
+      unlockTier: computeUnlockTier(shards),
     };
   } catch {
-    return { runs: 0, escapes: 0, bestTime: 0 };
+    return { runs: 0, escapes: 0, bestTime: 0, shards: 0, unlockTier: 0 };
   }
 }
 
@@ -2816,5 +3360,6 @@ if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) {
 }
 
 applyStaticText();
-pushLog(state.lang === "ko" ? "빈 방을 점거하고, 운을 뚫으며 탈출하세요." : "Find a vacant room, then build enough luck to escape.");
+pushLog(langText("빈 방을 점거하고, 운을 뚫으며 탈출하세요.", "Find a vacant room, then build enough luck to escape."));
+announceRunSetup();
 requestAnimationFrame(loop);
