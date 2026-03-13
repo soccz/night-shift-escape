@@ -141,6 +141,31 @@ body::after {
   content: "";
 }
 
+.low-fx * {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
+
+.low-fx .title-stack,
+.low-fx .title-card,
+.low-fx button {
+  animation: none !important;
+}
+
+.low-fx .viewport::after,
+.low-fx body::before {
+  opacity: 0.12;
+}
+
+.low-fx .overlay-card,
+.low-fx .panel,
+.low-fx .quick-help,
+.low-fx .hud-panel,
+.low-fx .title-overlay,
+.low-fx .pause-overlay {
+  backdrop-filter: none;
+}
+
 button {
   border: 1px solid rgba(255, 255, 255, 0.12);
   background:
@@ -543,19 +568,50 @@ button:hover {
 }
 
 #objectiveText {
+  display: grid;
+  gap: 6px;
   font-size: 18px;
   line-height: 1.4;
   color: var(--text);
   font-weight: 700;
 }
 
+.mission-kicker,
+.prompt-kicker {
+  color: var(--accent);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.mission-body {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
 #promptText {
+  display: grid;
+  gap: 6px;
   margin-top: 10px;
   padding: 10px 12px;
   color: #d8eeff;
   background: linear-gradient(90deg, rgba(133, 216, 255, 0.12), rgba(255, 212, 109, 0.08));
   border: 1px solid rgba(133, 216, 255, 0.12);
   clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+.prompt-main {
+  color: #f5fbff;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.prompt-income {
+  color: var(--gold);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .sidebar {

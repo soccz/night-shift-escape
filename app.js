@@ -1,7 +1,7 @@
 "use strict";
 
 const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const ctx = canvas.getContext("2d", { alpha: false });
 const stageEl = document.getElementById("gameStage");
 
 const statsEl = document.getElementById("stats");
@@ -25,6 +25,7 @@ const controlsList = document.getElementById("controlsList");
 const logHeading = document.getElementById("logHeading");
 const metaHeading = document.getElementById("metaHeading");
 const languageButton = document.getElementById("languageButton");
+const performanceButton = document.getElementById("performanceButton");
 const hudToggleButton = document.getElementById("hudToggleButton");
 const muteButton = document.getElementById("muteButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -51,6 +52,8 @@ const I18N = {
   ko: {
     subtitle: "브라우저용 애니 호러 솔로 디펜스 런.",
     themeChip: "셀 호러 HUD",
+    performance_on: "간소화 ON",
+    performance_off: "간소화 OFF",
     hud_show: "HUD 열기",
     hud_hide: "HUD 닫기",
     mute: "사운드",
@@ -142,6 +145,8 @@ const I18N = {
   en: {
     subtitle: "Anime-horror solo defense run for the browser.",
     themeChip: "Cel Horror HUD",
+    performance_on: "Lite FX On",
+    performance_off: "Lite FX Off",
     hud_show: "Show HUD",
     hud_hide: "Hide HUD",
     mute: "Sound",
@@ -646,6 +651,7 @@ const state = {
   adminMode: false,
   paused: false,
   sidebarCollapsed: window.matchMedia && window.matchMedia("(max-width: 1120px)").matches,
+  lowFx: loadPerformanceMode(),
   screenShake: 0,
   audio: createAudioState(),
   effects: [],
@@ -663,6 +669,15 @@ const state = {
   camera: {
     x: 0,
     y: 0,
+  },
+  hudCache: {
+    lastRenderAt: 0,
+    stats: "",
+    meta: "",
+    objective: "",
+    prompt: "",
+    help: "",
+    log: "",
   },
 };
 
@@ -894,7 +909,7 @@ function handleMetaNodeAction(nodeId) {
     state.meta.shards -= node.cost;
     state.meta.unlockedNodes.push(node.id);
     saveMeta(state.meta);
-    renderHud();
+    renderHud(true);
     pushLog(langText(`${localize(node.title)} 해금.`, `${localize(node.title)} unlocked.`));
     return;
   }
@@ -902,7 +917,7 @@ function handleMetaNodeAction(nodeId) {
   if (isMetaNodeSelected(state.meta, node.id)) {
     state.meta.selectedNodes = state.meta.selectedNodes.filter((entry) => entry !== node.id);
     saveMeta(state.meta);
-    renderHud();
+    renderHud(true);
     pushLog(langText(`${localize(node.title)} 해제. 다음 런에 반영됩니다.`, `${localize(node.title)} unequipped for the next run.`));
     return;
   }
@@ -913,7 +928,7 @@ function handleMetaNodeAction(nodeId) {
   }
   state.meta.selectedNodes.push(node.id);
   saveMeta(state.meta);
-  renderHud();
+  renderHud(true);
   pushLog(langText(`${localize(node.title)} 장착. 다음 런에 반영됩니다.`, `${localize(node.title)} equipped for the next run.`));
 }
 
@@ -1311,7 +1326,7 @@ function resetGame() {
   updateCamera();
   pushLog(langText("런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요.", "Run reset. Claim a room and survive long enough to escape."));
   announceRunSetup();
-  renderHud();
+  renderHud(true);
 }
 
 function setPaused(nextPaused) {
@@ -1418,13 +1433,14 @@ function toggleLanguage() {
   state.lang = state.lang === "ko" ? "en" : "ko";
   saveLanguage(state.lang);
   applyStaticText();
-  renderHud();
+  renderHud(true);
 }
 
 function applyStaticText() {
   document.documentElement.lang = state.lang;
   subtitleText.textContent = t("subtitle");
   themeChip.textContent = t("themeChip");
+  performanceButton.textContent = state.lowFx ? t("performance_on") : t("performance_off");
   hudToggleButton.textContent = state.sidebarCollapsed ? t("hud_show") : t("hud_hide");
   muteButton.textContent = state.audio.muted ? t("mute_off") : t("mute_on");
   pauseButton.textContent = state.paused ? t("resume") : t("pause");
@@ -1451,6 +1467,7 @@ function applyStaticText() {
   dockReinforceButton.textContent = t("dock_reinforce");
   languageButton.textContent = state.lang === "ko" ? "EN" : "KO";
   sidebar.classList.toggle("collapsed", state.sidebarCollapsed);
+  document.body.classList.toggle("low-fx", state.lowFx);
   controlsList.innerHTML = I18N[state.lang].controls
     .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
     .join("");
@@ -1459,6 +1476,12 @@ function applyStaticText() {
 restartButton.addEventListener("click", resetGame);
 startButton.addEventListener("click", startRun);
 languageButton.addEventListener("click", toggleLanguage);
+performanceButton.addEventListener("click", () => {
+  state.lowFx = !state.lowFx;
+  savePerformanceMode(state.lowFx);
+  applyStaticText();
+  renderHud(true);
+});
 hudToggleButton.addEventListener("click", () => {
   state.sidebarCollapsed = !state.sidebarCollapsed;
   applyStaticText();
@@ -3542,8 +3565,9 @@ function canMoveToGhost(x, y, radius, floor = game.player.floor) {
 function draw() {
   drawBackdrop();
   ctx.save();
-  const shakeX = (Math.random() - 0.5) * state.screenShake * 10;
-  const shakeY = (Math.random() - 0.5) * state.screenShake * 10;
+  const shakeScale = state.lowFx ? 4 : 10;
+  const shakeX = (Math.random() - 0.5) * state.screenShake * shakeScale;
+  const shakeY = (Math.random() - 0.5) * state.screenShake * shakeScale;
   ctx.translate(shakeX, shakeY);
   drawAtmosphere();
   ctx.save();
@@ -3557,7 +3581,9 @@ function draw() {
   drawEffects();
   ctx.restore();
   drawThreatOverlay();
-  drawHudMap();
+  if (!state.lowFx) {
+    drawHudMap();
+  }
   drawLighting();
   ctx.restore();
   drawBanner();
@@ -3600,12 +3626,15 @@ function drawBackdrop() {
   ctx.fillStyle = blueBloom;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  if (dangerLevel() > 0.18) {
+  if (!state.lowFx && dangerLevel() > 0.18) {
     drawSpeedLines(dangerLevel() * 0.14);
   }
 }
 
 function drawAtmosphere() {
+  if (state.lowFx) {
+    return;
+  }
   const time = game.time;
   const danger = dangerLevel();
 
@@ -4518,8 +4547,8 @@ function showBanner(title, subtitle, color, duration) {
     title,
     subtitle,
     color,
-    life: duration,
-    maxLife: duration,
+    life: state.lowFx ? duration * 0.75 : duration,
+    maxLife: state.lowFx ? duration * 0.75 : duration,
   };
 }
 
@@ -4538,8 +4567,8 @@ function updateFlash(dt) {
 function flashScreen(color, alpha, duration) {
   state.flash = {
     color,
-    alpha,
-    maxAlpha: alpha,
+    alpha: state.lowFx ? alpha * 0.45 : alpha,
+    maxAlpha: state.lowFx ? alpha * 0.45 : alpha,
     life: duration,
     maxLife: duration,
   };
@@ -4556,6 +4585,9 @@ function updateEffects(dt) {
 }
 
 function spawnImpact(x, y, color, size, spikes) {
+  if (state.lowFx) {
+    return;
+  }
   state.effects.push({
     kind: "impact",
     x,
@@ -4569,6 +4601,9 @@ function spawnImpact(x, y, color, size, spikes) {
 }
 
 function spawnSlash(x1, y1, x2, y2, color) {
+  if (state.lowFx) {
+    return;
+  }
   state.effects.push({
     kind: "slash",
     x1,
@@ -4584,6 +4619,9 @@ function spawnSlash(x1, y1, x2, y2, color) {
 }
 
 function spawnTracer(x1, y1, x2, y2, color) {
+  if (state.lowFx) {
+    return;
+  }
   state.effects.push({
     kind: "tracer",
     x1,
@@ -4608,6 +4646,9 @@ function effectPalette(name) {
 }
 
 function drawAfterimages() {
+  if (state.lowFx) {
+    return;
+  }
   const danger = dangerLevel();
   if (danger < 0.08) {
     return;
@@ -4629,6 +4670,9 @@ function drawAfterimages() {
 }
 
 function drawEffects() {
+  if (state.lowFx) {
+    return;
+  }
   for (const effect of state.effects) {
     if (effect.kind === "impact") {
       drawImpactEffect(effect);
@@ -4711,7 +4755,12 @@ function drawTracerEffect(effect) {
   ctx.restore();
 }
 
-function renderHud() {
+function renderHud(force = false) {
+  const now = performance.now();
+  if (!force && now - state.hudCache.lastRenderAt < (state.lowFx ? 180 : 120)) {
+    return;
+  }
+  state.hudCache.lastRenderAt = now;
   const ownedRoom = getOwnedRoom();
   const primaryStats = [
     [t("stat_health"), `${Math.ceil(game.player.hp)}`, game.player.hp < 30 ? "danger" : ""],
@@ -4730,7 +4779,7 @@ function renderHud() {
     [t("stat_admin"), state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
   ];
 
-  statsEl.innerHTML = `
+  const statsHtml = `
     <div class="stats-primary">
       ${primaryStats
         .map(
@@ -4756,6 +4805,10 @@ function renderHud() {
         .join("")}
     </div>
   `;
+  if (statsHtml !== state.hudCache.stats) {
+    state.hudCache.stats = statsHtml;
+    statsEl.innerHTML = statsHtml;
+  }
 
   const metaRows = [
     [t("meta_runs"), String(state.meta.runs)],
@@ -4765,9 +4818,13 @@ function renderHud() {
     [t("meta_unlock"), getUnlockSummary(state.meta)],
   ];
 
-  metaEl.innerHTML = metaRows
+  const metaHtml = metaRows
     .map(([label, value]) => `<div class="stat-row"><span>${label}</span><strong>${value}</strong></div>`)
     .join("") + renderMetaTree();
+  if (metaHtml !== state.hudCache.meta) {
+    state.hudCache.meta = metaHtml;
+    metaEl.innerHTML = metaHtml;
+  }
 
   const ownedObjective = !ownedRoom
     ? t("objective_findRoom")
@@ -4784,39 +4841,57 @@ function renderHud() {
             ? t("objective_sigils")
             : t("objective_escape");
 
-  objectiveEl.textContent = ownedObjective;
+  const objectiveHtml = `<span class="mission-kicker">${langText("현재 목표", "Current Goal")}</span><span class="mission-body">${ownedObjective}</span>`;
+  if (objectiveHtml !== state.hudCache.objective) {
+    state.hudCache.objective = objectiveHtml;
+    objectiveEl.innerHTML = objectiveHtml;
+  }
 
   const prompt = getPrompt();
-  promptEl.textContent = prompt ? `${langText("지금 할 행동", "Next Action")}: ${prompt.text}` : `${langText("지금 할 행동", "Next Action")}: ${t("prompt_none")}`;
+  const incomeText = formatIncomeStatus(ownedRoom);
+  const promptHtml = `
+    <span class="prompt-kicker">${langText("지금 할 행동", "Next Action")}</span>
+    <strong class="prompt-main">${prompt ? prompt.text : t("prompt_none")}</strong>
+    <span class="prompt-income">${incomeText}</span>
+  `;
+  if (promptHtml !== state.hudCache.prompt) {
+    state.hudCache.prompt = promptHtml;
+    promptEl.innerHTML = promptHtml;
+  }
+  let helpValue;
   if (game.suppressionTime > 0) {
-    helpText.textContent = langText(
+    helpValue = langText(
       `억제 장막 ${game.suppressionTime.toFixed(1)}초 남음. 수호자들이 멈췄습니다.`,
       `Suppression field ${game.suppressionTime.toFixed(1)}s remaining. Guardians are stalled.`,
     );
   } else if (game.floorHazards.archiveLock > 0 && game.player.floor === "f2") {
-    helpText.textContent = langText(
+    helpValue = langText(
       `아카이브 봉쇄 ${game.floorHazards.archiveLock.toFixed(1)}초. 2층 이동이 무거워집니다.`,
       `Archive lock ${game.floorHazards.archiveLock.toFixed(1)}s. Movement is heavier on Floor 2.`,
     );
   } else if (game.floorHazards.powerSurge > 0 && game.player.floor === "f1") {
-    helpText.textContent = langText(
+    helpValue = langText(
       `전력 폭주 ${game.floorHazards.powerSurge.toFixed(1)}초. 하층 문선이 위험합니다.`,
       `Power surge ${game.floorHazards.powerSurge.toFixed(1)}s. Door lines on Floor 1 are unstable.`,
     );
   } else if (game.anomaly && game.anomaly.floor === game.player.floor) {
-    helpText.textContent = langText(
+    helpValue = langText(
       `봉인 균열이 열렸습니다. ${game.anomaly.timer.toFixed(1)}초 안에 닿아 봉합하세요.`,
       `A seal rift is open. Reach it within ${game.anomaly.timer.toFixed(1)}s to seal it.`,
     );
   } else if (game.contract) {
-    helpText.textContent = `${localize(game.contract.title)}: ${localize(game.contract.description)}`;
+    helpValue = `${localize(game.contract.title)}: ${localize(game.contract.description)}`;
   } else if (state.paused) {
-    helpText.textContent = langText("정지 중입니다. 계속 버튼이나 Esc/P로 복귀하세요.", "Paused. Resume with the button or Esc/P.");
+    helpValue = langText("정지 중입니다. 계속 버튼이나 Esc/P로 복귀하세요.", "Paused. Resume with the button or Esc/P.");
   } else {
-    helpText.textContent = t("helpText");
+    helpValue = t("helpText");
+  }
+  if (helpValue !== state.hudCache.help) {
+    state.hudCache.help = helpValue;
+    helpText.textContent = helpValue;
   }
 
-  logEl.innerHTML = state.logs
+  const logHtml = state.logs
     .slice(-8)
     .reverse()
     .map(
@@ -4824,11 +4899,40 @@ function renderHud() {
         `<div class="log-entry"><span class="log-time">${entry.time}</span><span>${entry.text}</span></div>`,
     )
     .join("");
+  if (logHtml !== state.hudCache.log) {
+    state.hudCache.log = logHtml;
+    logEl.innerHTML = logHtml;
+  }
 }
 
 function pushLog(text) {
   state.logs.push({ time: formatTime(game.time), text });
-  renderHud();
+  renderHud(true);
+}
+
+function formatIncomeStatus(ownedRoom) {
+  if (!ownedRoom) {
+    return langText(
+      `수익 규칙: 방 안 +${CONFIG.economy.goldPerSecondInRoom}/초, 침대 보너스 +${CONFIG.economy.goldPerSecondOnBedBonus}/초`,
+      `Income: room +${CONFIG.economy.goldPerSecondInRoom}/s, bed bonus +${CONFIG.economy.goldPerSecondOnBedBonus}/s`,
+    );
+  }
+
+  if (ownedRoom.floor !== game.player.floor || !pointInRect(game.player.x, game.player.y, ownedRoom)) {
+    return langText("내 방으로 돌아가면 기본 수익이 다시 들어옵니다.", "Return to your room to resume base income.");
+  }
+
+  if (distance(game.player, ownedRoom.bed) < 34) {
+    return langText(
+      `수익 중: +${CONFIG.economy.goldPerSecondInRoom + CONFIG.economy.goldPerSecondOnBedBonus}/초, 회복 중`,
+      `Earning: +${CONFIG.economy.goldPerSecondInRoom + CONFIG.economy.goldPerSecondOnBedBonus}/s and healing`,
+    );
+  }
+
+  return langText(
+    `수익 중: +${CONFIG.economy.goldPerSecondInRoom}/초. 침대에 가면 더 빨라집니다.`,
+    `Earning: +${CONFIG.economy.goldPerSecondInRoom}/s. Move to the bed for more.`,
+  );
 }
 
 function formatTime(seconds) {
@@ -4970,7 +5074,7 @@ function saveMeta(meta) {
 }
 
 function pulseShake(amount) {
-  state.screenShake = Math.max(state.screenShake, amount);
+  state.screenShake = Math.max(state.screenShake, state.lowFx ? amount * 0.45 : amount);
 }
 
 function createAudioState() {
@@ -5094,6 +5198,20 @@ function loadMutePreference() {
   }
 }
 
+function loadPerformanceMode() {
+  try {
+    return localStorage.getItem("night-shift-escape-lowfx") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function savePerformanceMode(value) {
+  try {
+    localStorage.setItem("night-shift-escape-lowfx", value ? "1" : "0");
+  } catch {}
+}
+
 function saveMutePreference(muted) {
   try {
     localStorage.setItem("night-shift-escape-muted", muted ? "1" : "0");
@@ -5106,7 +5224,7 @@ function loop(now) {
   update(dt);
   updateAmbientAudio();
   draw();
-  renderHud();
+  renderHud(false);
   requestAnimationFrame(loop);
 }
 
