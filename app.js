@@ -106,6 +106,17 @@ const I18N = {
     meta_bestTime: "최고 시간",
     meta_shards: "잔재",
     meta_unlock: "기록 단계",
+    meta_loadout: "장착 트리",
+    meta_slots: "장착 슬롯",
+    meta_next_run: "선택 변경은 다음 런부터 적용됩니다.",
+    meta_unlock_action: "해금",
+    meta_select_action: "장착",
+    meta_deselect_action: "해제",
+    meta_locked: "잠김",
+    meta_active: "활성",
+    meta_inactive: "대기",
+    meta_need_parent: "상위 노드 필요",
+    meta_need_shards: "잔재 부족",
     room_none: "없음",
     movement_wasd: "키보드",
     movement_click: "포인트",
@@ -186,6 +197,17 @@ const I18N = {
     meta_bestTime: "Best time",
     meta_shards: "Shards",
     meta_unlock: "Archive tier",
+    meta_loadout: "Loadout Tree",
+    meta_slots: "Active slots",
+    meta_next_run: "Selection changes apply on the next run.",
+    meta_unlock_action: "Unlock",
+    meta_select_action: "Equip",
+    meta_deselect_action: "Unequip",
+    meta_locked: "Locked",
+    meta_active: "Active",
+    meta_inactive: "Idle",
+    meta_need_parent: "Parent node required",
+    meta_need_shards: "Not enough shards",
     room_none: "None",
     movement_wasd: "Keyboard",
     movement_click: "Point",
@@ -502,6 +524,113 @@ const HUNTER_SKILLS = {
   },
 };
 
+const META_TREE = [
+  {
+    id: "night_ledger",
+    tier: 0,
+    cost: 3,
+    title: { ko: "야간 장부", en: "Night Ledger" },
+    description: { ko: "시작 자금과 침대 수익이 늘어납니다.", en: "More starting cash and bed income." },
+    mods: {
+      startingGoldBonus: 30,
+      goldGainMultiplier: 1.08,
+    },
+  },
+  {
+    id: "relay_map",
+    tier: 0,
+    cost: 3,
+    title: { ko: "중계 지도", en: "Relay Map" },
+    description: { ko: "정보 구매가 싸지고 레이더가 오래 갑니다.", en: "Cheaper intel and longer radar windows." },
+    mods: {
+      intelCostMultiplier: 0.88,
+      radarDurationMultiplier: 1.14,
+      compassDurationMultiplier: 1.1,
+    },
+  },
+  {
+    id: "iron_vows",
+    tier: 1,
+    cost: 5,
+    parent: "night_ledger",
+    title: { ko: "철의 서약", en: "Iron Vows" },
+    description: { ko: "체력과 수리 안정성이 올라갑니다.", en: "More HP and steadier repairs." },
+    mods: {
+      playerMaxHpBonus: 12,
+      repairDurationMultiplier: 0.88,
+      blackoutIntervalMultiplier: 1.05,
+    },
+  },
+  {
+    id: "hex_engine",
+    tier: 1,
+    cost: 5,
+    parent: "relay_map",
+    title: { ko: "주술 엔진", en: "Hex Engine" },
+    description: { ko: "소환비 절감과 전설 가중치가 붙습니다.", en: "Cheaper summons and better relic odds." },
+    mods: {
+      summonCostMultiplier: 0.88,
+      playerRelicWeightBonus: 4,
+    },
+  },
+  {
+    id: "salt_script",
+    tier: 2,
+    cost: 7,
+    parent: "iron_vows",
+    title: { ko: "소금 각본", en: "Salt Script" },
+    description: { ko: "감염 피해가 줄고 정전 주기가 늦춰집니다.", en: "Lower infected damage and slower blackout cycles." },
+    mods: {
+      infectedDamageMultiplier: 0.84,
+      blackoutIntervalMultiplier: 1.12,
+      infectedSpeedMultiplier: 0.92,
+    },
+  },
+  {
+    id: "phantom_route",
+    tier: 2,
+    cost: 7,
+    parent: "hex_engine",
+    title: { ko: "유령 항로", en: "Phantom Route" },
+    description: { ko: "나침반과 AI 방어가 강화됩니다.", en: "Stronger compass time and smarter allied rooms." },
+    mods: {
+      compassDurationMultiplier: 1.22,
+      hiderUnitCapBonus: 1,
+      goldGainMultiplier: 1.05,
+    },
+  },
+];
+
+const INFECTED_TYPES = {
+  infected: {
+    radius: 11,
+    hpMultiplier: 1,
+    speedMultiplier: 1,
+    playerDamageMultiplier: 1,
+    doorDamageMultiplier: 1,
+    cooldown: 1,
+    phasing: false,
+  },
+  wisp: {
+    radius: 9,
+    hpMultiplier: 0.7,
+    speedMultiplier: 1.42,
+    playerDamageMultiplier: 0.85,
+    doorDamageMultiplier: 0,
+    cooldown: 0.72,
+    phasing: true,
+  },
+  brute: {
+    radius: 14,
+    hpMultiplier: 1.65,
+    speedMultiplier: 0.78,
+    playerDamageMultiplier: 1.35,
+    doorDamageMultiplier: 1.85,
+    cooldown: 1.3,
+    phasing: false,
+  },
+};
+
 const keys = new Set();
 const state = {
   runStartedAt: performance.now(),
@@ -571,8 +700,9 @@ function computeUnlockTier(shards) {
 }
 
 function getMetaBonuses(meta) {
-  const tier = computeUnlockTier(meta.shards || 0);
-  return {
+  const archiveXp = meta.archiveXp ?? meta.shards ?? 0;
+  const tier = computeUnlockTier(archiveXp);
+  const baseBonuses = {
     tier,
     startingGoldBonus: [0, 30, 65, 110][tier] || 0,
     playerMaxHpBonus: [0, 0, 12, 24][tier] || 0,
@@ -583,6 +713,18 @@ function getMetaBonuses(meta) {
     playerRelicWeightBonus: [0, 0, 2, 4][tier] || 0,
     hiderUnitCapBonus: [0, 0, 1, 1][tier] || 0,
   };
+  const selectedNodeMods = (meta.selectedNodes || [])
+    .slice(0, getMetaSelectionLimit(meta))
+    .filter((nodeId) => (meta.unlockedNodes || []).includes(nodeId))
+    .map((nodeId) => META_TREE.find((entry) => entry.id === nodeId)?.mods)
+    .filter(Boolean);
+  return combineRunModifiers(baseBonuses, ...selectedNodeMods);
+}
+
+function getMetaSelectionLimit(meta) {
+  const archiveXp = meta.archiveXp ?? meta.shards ?? 0;
+  const tier = computeUnlockTier(archiveXp);
+  return [1, 1, 2, 3][tier] || 1;
 }
 
 function combineRunModifiers(...modifierSets) {
@@ -653,7 +795,8 @@ function createRunProfile(metaBonuses) {
 }
 
 function getUnlockSummary(meta) {
-  const tier = computeUnlockTier(meta.shards || 0);
+  const archiveXp = meta.archiveXp ?? meta.shards ?? 0;
+  const tier = computeUnlockTier(archiveXp);
   const summaries = [
     { ko: "T0 기본", en: "T0 Base" },
     { ko: "T1 시작 골드 보정", en: "T1 Bonus start gold" },
@@ -661,6 +804,114 @@ function getUnlockSummary(meta) {
     { ko: "T3 상위 기록 보정", en: "T3 advanced archive" },
   ];
   return localize(summaries[tier] || summaries[0]);
+}
+
+function isMetaNodeUnlocked(meta, nodeId) {
+  return (meta.unlockedNodes || []).includes(nodeId);
+}
+
+function isMetaNodeSelected(meta, nodeId) {
+  return (meta.selectedNodes || []).includes(nodeId);
+}
+
+function canUnlockMetaNode(meta, node) {
+  const archiveXp = meta.archiveXp ?? meta.shards ?? 0;
+  const tier = computeUnlockTier(archiveXp);
+  const hasParent = !node.parent || isMetaNodeUnlocked(meta, node.parent);
+  return tier >= node.tier && hasParent && (meta.shards || 0) >= node.cost && !isMetaNodeUnlocked(meta, node.id);
+}
+
+function renderMetaTree() {
+  const activeCount = (state.meta.selectedNodes || []).length;
+  const slotLimit = getMetaSelectionLimit(state.meta);
+  const archiveXp = state.meta.archiveXp ?? state.meta.shards ?? 0;
+  const tier = computeUnlockTier(archiveXp);
+  const rows = META_TREE.map((node) => {
+    const unlocked = isMetaNodeUnlocked(state.meta, node.id);
+    const selected = isMetaNodeSelected(state.meta, node.id);
+    const canUnlock = canUnlockMetaNode(state.meta, node);
+    const buttonLabel = unlocked
+      ? selected
+        ? t("meta_deselect_action")
+        : t("meta_select_action")
+      : t("meta_unlock_action");
+    const status = unlocked
+      ? selected
+        ? t("meta_active")
+        : t("meta_inactive")
+      : node.parent && !isMetaNodeUnlocked(state.meta, node.parent)
+        ? t("meta_need_parent")
+        : tier < node.tier
+          ? `T${node.tier}`
+          : (state.meta.shards || 0) < node.cost
+            ? t("meta_need_shards")
+            : t("meta_locked");
+    return `
+      <div class="meta-node ${selected ? "active" : ""} ${unlocked ? "unlocked" : "locked"}">
+        <div class="meta-node-copy">
+          <div class="meta-node-head">
+            <strong>${localize(node.title)}</strong>
+            <span>T${node.tier} · ${node.cost}</span>
+          </div>
+          <p>${localize(node.description)}</p>
+          <div class="meta-node-state">${status}</div>
+        </div>
+        <button
+          type="button"
+          class="meta-node-button"
+          data-meta-node="${node.id}"
+          ${!unlocked && !canUnlock ? "disabled" : ""}
+        >${buttonLabel}</button>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="meta-tree-summary">
+      <div class="stat-row"><span>${t("meta_slots")}</span><strong>${activeCount} / ${slotLimit}</strong></div>
+      <div class="meta-tree-note">${t("meta_next_run")}</div>
+    </div>
+    <div class="meta-tree">${rows}</div>
+  `;
+}
+
+function handleMetaNodeAction(nodeId) {
+  const node = META_TREE.find((entry) => entry.id === nodeId);
+  if (!node) {
+    return;
+  }
+
+  state.meta.unlockedNodes = state.meta.unlockedNodes || [];
+  state.meta.selectedNodes = state.meta.selectedNodes || [];
+
+  if (!isMetaNodeUnlocked(state.meta, node.id)) {
+    if (!canUnlockMetaNode(state.meta, node)) {
+      return;
+    }
+    state.meta.shards -= node.cost;
+    state.meta.unlockedNodes.push(node.id);
+    saveMeta(state.meta);
+    renderHud();
+    pushLog(langText(`${localize(node.title)} 해금.`, `${localize(node.title)} unlocked.`));
+    return;
+  }
+
+  if (isMetaNodeSelected(state.meta, node.id)) {
+    state.meta.selectedNodes = state.meta.selectedNodes.filter((entry) => entry !== node.id);
+    saveMeta(state.meta);
+    renderHud();
+    pushLog(langText(`${localize(node.title)} 해제. 다음 런에 반영됩니다.`, `${localize(node.title)} unequipped for the next run.`));
+    return;
+  }
+
+  if (state.meta.selectedNodes.length >= getMetaSelectionLimit(state.meta)) {
+    pushLog(langText("장착 슬롯이 가득 찼습니다.", "No archive slots left."));
+    return;
+  }
+  state.meta.selectedNodes.push(node.id);
+  saveMeta(state.meta);
+  renderHud();
+  pushLog(langText(`${localize(node.title)} 장착. 다음 런에 반영됩니다.`, `${localize(node.title)} equipped for the next run.`));
 }
 
 function announceRunSetup() {
@@ -1025,6 +1276,10 @@ function createGame() {
     nextContractTimer: 18,
     anomaly: null,
     nextAnomalyTimer: randomRange(26, 40),
+    floorHazards: {
+      powerSurge: 0,
+      archiveLock: 0,
+    },
     stats: {
       infectedKills: 0,
       intelPurchases: 0,
@@ -1211,6 +1466,13 @@ resumeButton.addEventListener("click", () => {
   setPaused(false);
 });
 pauseMuteButton.addEventListener("click", toggleMute);
+metaEl.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-meta-node]");
+  if (!button) {
+    return;
+  }
+  handleMetaNodeAction(button.dataset.metaNode);
+});
 dockModeButton.addEventListener("click", () => {
   state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
   state.clickTarget = null;
@@ -1612,6 +1874,27 @@ function handleGateUnlockFeedback(gateWasClosed) {
   flashScreen("rgba(255, 211, 107, 0.24)", 0.48, 0.22);
 }
 
+function infectedProfile(type) {
+  return INFECTED_TYPES[type] || INFECTED_TYPES.infected;
+}
+
+function rollInfectedType(floor, forcedType = null) {
+  if (forcedType) {
+    return forcedType;
+  }
+  if (floor === "f2") {
+    return weightedDraw({
+      infected: 28,
+      wisp: game.runProfile.hunter.id === "brood" ? 44 : 38,
+      brute: 28,
+    });
+  }
+  return weightedDraw({
+    infected: 68,
+    brute: 32,
+  });
+}
+
 function roomUnits(roomId, ownerId = null) {
   return game.units.filter((unit) => unit.roomId === roomId && (!ownerId || unit.ownerId === ownerId));
 }
@@ -1887,6 +2170,8 @@ function update(dt) {
   game.radarTime = Math.max(0, game.radarTime - dt);
   game.compassTime = Math.max(0, game.compassTime - dt);
   game.suppressionTime = Math.max(0, game.suppressionTime - dt);
+  game.floorHazards.powerSurge = Math.max(0, game.floorHazards.powerSurge - dt);
+  game.floorHazards.archiveLock = Math.max(0, game.floorHazards.archiveLock - dt);
   game.intelNoise = Math.max(0, game.intelNoise - dt);
   state.screenShake = Math.max(0, state.screenShake - dt * CONFIG.feedback.shakeDecayPerSecond);
   updateEffects(dt);
@@ -1951,7 +2236,8 @@ function updatePlayer(dt) {
     }
   }
 
-  const speed = player.speed;
+  const floorSlow = player.floor === "f2" && game.floorHazards.archiveLock > 0 ? 0.82 : 1;
+  const speed = player.speed * floorSlow;
   moveEntity(player, dx * speed * dt, dy * speed * dt);
   player.roomId = getRoomAt(player.x, player.y)?.id || null;
 
@@ -2212,6 +2498,37 @@ function updateHunter(dt) {
   handleHunterAttacks();
 }
 
+function triggerFloorHunterPattern(activeRoom) {
+  if (game.hunter.floor === "f1") {
+    game.floorHazards.powerSurge = Math.max(game.floorHazards.powerSurge, 7);
+    game.blackoutTimer = Math.min(game.blackoutTimer, 12);
+    spawnInfectedAt(world.generator.x, world.generator.y - 36, 1, "f1", "brute");
+    pushLog(langText("하층 전력 폭주. 발전기 라인이 흔들립니다.", "Lower-floor surge. The generator line buckles."));
+    showBanner(langText("전력 폭주", "Power Surge"), formatFloorName("f1"), "amber", 1.05);
+    playUiTone(132, 0.2, "square", 0.05);
+    pulseShake(1.3);
+    return;
+  }
+
+  game.floorHazards.archiveLock = Math.max(game.floorHazards.archiveLock, 7.5);
+  spawnInfectedAt(activeRoom.x + activeRoom.w / 2, activeRoom.y + activeRoom.h / 2, 2, "f2", "wisp");
+  if (!game.anomaly || game.anomaly.floor !== "f2") {
+    const anchors = anomalyAnchorsForFloor("f2");
+    const point = pickOne(anchors);
+    game.anomaly = {
+      floor: "f2",
+      x: point.x,
+      y: point.y,
+      timer: randomRange(10, 14),
+      maxTimer: 14,
+    };
+  }
+  pushLog(langText("상층 기록이 뒤틀립니다. 유령 개체가 새어 나옵니다.", "The upper archives distort. Spectral entities leak out."));
+  showBanner(langText("아카이브 봉쇄", "Archive Lock"), formatFloorName("f2"), "violet", 1.05);
+  playUiTone(188, 0.18, "triangle", 0.05);
+  pulseShake(1.4);
+}
+
 function castHunterSkill() {
   const ownedRoom = getOwnedRoom();
   const activeRoom =
@@ -2223,6 +2540,8 @@ function castHunterSkill() {
   if (!activeRoom) {
     return;
   }
+
+  triggerFloorHunterPattern(activeRoom);
 
   if (hunterType === "stalker") {
     const anchor = game.player.roomId === activeRoom.id
@@ -2448,6 +2767,7 @@ function handleHunterDoorDamage() {
   const damage =
     (CONFIG.hunter.baseDoorDamage + game.hunter.level * CONFIG.hunter.damagePerLevel) *
     mode.damage *
+    (game.floorHazards.powerSurge > 0 && game.hunter.floor === "f1" ? 1.24 : 1) *
     game.runProfile.modifiers.hunterDoorDamageMultiplier *
     game.runProfile.modifiers.hunterDamageMultiplier;
   room.door.hp -= damage;
@@ -2504,12 +2824,14 @@ function updateInfected(dt) {
     if (enemy.floor !== game.player.floor) {
       continue;
     }
+    const profile = infectedProfile(enemy.type);
     const target = pickInfectedTarget(enemy);
     moveEntityWithPath(enemy, target.x, target.y, enemy.speed * dt);
 
     const ownedRoom = getOwnedRoom();
     const localOwnedRoom = ownedRoom && ownedRoom.floor === enemy.floor ? ownedRoom : null;
     if (
+      !profile.phasing &&
       localOwnedRoom &&
       localOwnedRoom.door.closed &&
       !localOwnedRoom.door.broken &&
@@ -2517,9 +2839,9 @@ function updateInfected(dt) {
     ) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
-        enemy.attackCooldown = 1.1;
-        localOwnedRoom.door.hp -= CONFIG.infected.doorDamage * game.runProfile.modifiers.infectedDamageMultiplier;
-        spawnImpact(localOwnedRoom.door.centerX, localOwnedRoom.door.centerY, "amber", 0.7, 8);
+        enemy.attackCooldown = profile.cooldown;
+        localOwnedRoom.door.hp -= CONFIG.infected.doorDamage * profile.doorDamageMultiplier * game.runProfile.modifiers.infectedDamageMultiplier;
+        spawnImpact(localOwnedRoom.door.centerX, localOwnedRoom.door.centerY, enemy.type === "brute" ? "crimson" : "amber", enemy.type === "brute" ? 1.1 : 0.7, 8);
         if (localOwnedRoom.door.hp <= 0) {
           localOwnedRoom.door.hp = 0;
           localOwnedRoom.door.broken = true;
@@ -2536,13 +2858,13 @@ function updateInfected(dt) {
     if (distance(enemy, game.player) < 18) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
-        enemy.attackCooldown = 1;
-        game.player.hp -= CONFIG.infected.playerDamage * game.runProfile.modifiers.infectedDamageMultiplier;
+        enemy.attackCooldown = profile.cooldown;
+        game.player.hp -= CONFIG.infected.playerDamage * profile.playerDamageMultiplier * game.runProfile.modifiers.infectedDamageMultiplier;
         game.player.lastDamageSource = "infected";
         pulseShake(0.9);
         playUiTone(180, 0.06, "square", 0.03);
-        spawnImpact(game.player.x, game.player.y, "amber", 1.0, 10);
-        spawnSlash(enemy.x, enemy.y, game.player.x, game.player.y, "amber");
+        spawnImpact(game.player.x, game.player.y, enemy.type === "wisp" ? "violet" : "amber", enemy.type === "brute" ? 1.25 : 1.0, 10);
+        spawnSlash(enemy.x, enemy.y, game.player.x, game.player.y, enemy.type === "wisp" ? "violet" : "amber");
       }
     }
   }
@@ -2553,6 +2875,9 @@ function pickInfectedTarget(enemy) {
   const localOwnedRoom = ownedRoom && ownedRoom.floor === enemy.floor ? ownedRoom : null;
   if (enemy.floor !== game.player.floor) {
     return { x: enemy.x, y: enemy.y };
+  }
+  if (enemy.type === "wisp") {
+    return game.player;
   }
   if (!localOwnedRoom) {
     return game.player;
@@ -2588,15 +2913,18 @@ function collectKeycards() {
   }
 }
 
-function spawnInfectedAt(x, y, count, floor = game.hunter.floor) {
+function spawnInfectedAt(x, y, count, floor = game.hunter.floor, forcedType = null) {
   for (let index = 0; index < count; index += 1) {
+    const type = rollInfectedType(floor, forcedType);
+    const profile = infectedProfile(type);
     game.infected.push({
+      type,
       floor,
       x: x + randomRange(-18, 18),
       y: y + randomRange(-18, 18),
-      radius: 11,
-      hp: 26 * game.runProfile.modifiers.infectedHpMultiplier,
-      speed: randomRange(72, 92) * game.runProfile.modifiers.infectedSpeedMultiplier,
+      radius: profile.radius,
+      hp: 26 * profile.hpMultiplier * game.runProfile.modifiers.infectedHpMultiplier,
+      speed: randomRange(72, 92) * profile.speedMultiplier * game.runProfile.modifiers.infectedSpeedMultiplier,
       attackCooldown: 0,
     });
   }
@@ -3147,11 +3475,12 @@ function nearestNavNode(x, y, floor) {
 
 function moveEntity(entity, dx, dy) {
   const nextX = entity.x + dx;
-  if (canMoveTo(nextX, entity.y, entity.radius, entity.floor || game.player.floor)) {
+  const moveValidator = entity.type === "wisp" ? canMoveToGhost : canMoveTo;
+  if (moveValidator(nextX, entity.y, entity.radius, entity.floor || game.player.floor)) {
     entity.x = nextX;
   }
   const nextY = entity.y + dy;
-  if (canMoveTo(entity.x, nextY, entity.radius, entity.floor || game.player.floor)) {
+  if (moveValidator(entity.x, nextY, entity.radius, entity.floor || game.player.floor)) {
     entity.y = nextY;
   }
 }
@@ -3171,6 +3500,14 @@ function canMoveTo(x, y, radius, floor = game.player.floor) {
     colliders.push(world.exitRoom.gate);
   }
 
+  return !colliders.some((rect) => circleIntersectsRect(x, y, radius, rect));
+}
+
+function canMoveToGhost(x, y, radius, floor = game.player.floor) {
+  if (!world.zones.some((zone) => zone.floor === floor && pointInRect(x, y, zone))) {
+    return false;
+  }
+  const colliders = world.barriers.filter((rect) => rect.floor === floor);
   return !colliders.some((rect) => circleIntersectsRect(x, y, radius, rect));
 }
 
@@ -3656,11 +3993,17 @@ function drawCelOrb(x, y, radius, fill, rim, glow) {
 }
 
 function drawCharacter(entity, kind) {
+  const infectedType = kind === "infected" ? entity.type || "infected" : null;
   const palette = {
     player: { fill: colors.player, rim: "#ffffff", glow: 0.16, accent: "#85d8ff" },
     hunter: { fill: colors.hunter, rim: "#ffd0d8", glow: 0.3, accent: "#ff6f95" },
     hider: { fill: colors.hider, rim: "#ffffff", glow: 0.12, accent: "#85d8ff" },
-    infected: { fill: colors.infected, rim: "#ffd6b5", glow: 0.16, accent: "#ffb464" },
+    infected:
+      infectedType === "wisp"
+        ? { fill: "#8e6cff", rim: "#efe4ff", glow: 0.24, accent: "#d3c0ff" }
+        : infectedType === "brute"
+          ? { fill: "#b94f4f", rim: "#ffd3c5", glow: 0.22, accent: "#ffb078" }
+          : { fill: colors.infected, rim: "#ffd6b5", glow: 0.16, accent: "#ffb464" },
   }[kind];
 
   const radius = entity.radius || (kind === "hider" ? 11 : 10);
@@ -3721,15 +4064,29 @@ function drawCharacter(entity, kind) {
     ctx.fill();
     ctx.stroke();
   } else if (kind === "infected") {
-    ctx.beginPath();
-    ctx.moveTo(-radius * 0.75, -radius * 0.2);
-    ctx.lineTo(0, -radius);
-    ctx.lineTo(radius * 0.75, -radius * 0.2);
-    ctx.lineTo(radius * 0.25, radius * 0.95);
-    ctx.lineTo(-radius * 0.25, radius * 0.95);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    if (infectedType === "wisp") {
+      ctx.beginPath();
+      ctx.moveTo(0, -radius * 1.15);
+      ctx.lineTo(radius * 0.82, 0);
+      ctx.lineTo(0, radius * 0.68);
+      ctx.lineTo(-radius * 0.82, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    } else if (infectedType === "brute") {
+      ctx.fillRect(-radius * 0.75, -radius * 0.82, radius * 1.5, radius * 1.6);
+      ctx.strokeRect(-radius * 0.75, -radius * 0.82, radius * 1.5, radius * 1.6);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(-radius * 0.75, -radius * 0.2);
+      ctx.lineTo(0, -radius);
+      ctx.lineTo(radius * 0.75, -radius * 0.2);
+      ctx.lineTo(radius * 0.25, radius * 0.95);
+      ctx.lineTo(-radius * 0.25, radius * 0.95);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
   } else {
     ctx.beginPath();
     ctx.moveTo(0, -radius);
@@ -3766,18 +4123,37 @@ function drawPulseRing(x, y, radius, color) {
 
 function drawThreatOverlay() {
   const danger = dangerLevel();
-  if (danger < 0.12 && game.suppressionTime <= 0) {
+  if (
+    danger < 0.12 &&
+    game.suppressionTime <= 0 &&
+    game.floorHazards.powerSurge <= 0 &&
+    game.floorHazards.archiveLock <= 0
+  ) {
     return;
   }
 
-  const alpha = clamp(danger * 0.55 + (game.suppressionTime > 0 ? 0.18 : 0), 0, 0.55);
+  const alpha = clamp(
+    danger * 0.55 +
+      (game.suppressionTime > 0 ? 0.18 : 0) +
+      (game.floorHazards.archiveLock > 0 ? 0.12 : 0) +
+      (game.floorHazards.powerSurge > 0 ? 0.1 : 0),
+    0,
+    0.55,
+  );
   const pulse = 1 + Math.sin(game.time * 8) * 0.08;
-  ctx.fillStyle = game.suppressionTime > 0 ? `rgba(187, 122, 255, ${alpha})` : `rgba(255, 62, 116, ${alpha})`;
+  ctx.fillStyle =
+    game.suppressionTime > 0 || game.floorHazards.archiveLock > 0
+      ? `rgba(187, 122, 255, ${alpha})`
+      : `rgba(255, 62, 116, ${alpha})`;
   ctx.fillRect(24, HEIGHT - 72, 240 * pulse, 28);
   ctx.fillStyle = "#fff3f8";
   ctx.font = "700 16px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
   const label = game.suppressionTime > 0
     ? langText("억제 장막", "SUPPRESSION FIELD")
+    : game.floorHazards.archiveLock > 0
+      ? langText("아카이브 봉쇄", "ARCHIVE LOCK")
+      : game.floorHazards.powerSurge > 0
+        ? langText("전력 폭주", "POWER SURGE")
     : game.blackoutActive
       ? langText("정전 경보", "BLACKOUT ALERT")
       : langText("위협 상승", "THREAT RISING");
@@ -3863,6 +4239,8 @@ function dangerLevel() {
   level += Math.min(0.28, localInfectedCount * 0.04);
   level += game.player.hp < 40 ? 0.18 : 0;
   level += game.anomaly && game.anomaly.floor === game.player.floor ? 0.12 : 0;
+  level += game.floorHazards.powerSurge > 0 && game.player.floor === "f1" ? 0.08 : 0;
+  level += game.floorHazards.archiveLock > 0 && game.player.floor === "f2" ? 0.12 : 0;
   level += game.hunter.floor === game.player.floor && distance(game.hunter, game.player) < 240 ? 0.1 : 0;
   return clamp(level, 0, 1);
 }
@@ -4112,7 +4490,7 @@ function renderHud() {
 
   metaEl.innerHTML = metaRows
     .map(([label, value]) => `<div class="stat-row"><span>${label}</span><strong>${value}</strong></div>`)
-    .join("");
+    .join("") + renderMetaTree();
 
   const ownedObjective = !ownedRoom
     ? t("objective_findRoom")
@@ -4137,6 +4515,16 @@ function renderHud() {
     helpText.textContent = langText(
       `억제 장막 ${game.suppressionTime.toFixed(1)}초 남음. 수호자들이 멈췄습니다.`,
       `Suppression field ${game.suppressionTime.toFixed(1)}s remaining. Guardians are stalled.`,
+    );
+  } else if (game.floorHazards.archiveLock > 0 && game.player.floor === "f2") {
+    helpText.textContent = langText(
+      `아카이브 봉쇄 ${game.floorHazards.archiveLock.toFixed(1)}초. 2층 이동이 무거워집니다.`,
+      `Archive lock ${game.floorHazards.archiveLock.toFixed(1)}s. Movement is heavier on Floor 2.`,
+    );
+  } else if (game.floorHazards.powerSurge > 0 && game.player.floor === "f1") {
+    helpText.textContent = langText(
+      `전력 폭주 ${game.floorHazards.powerSurge.toFixed(1)}초. 하층 문선이 위험합니다.`,
+      `Power surge ${game.floorHazards.powerSurge.toFixed(1)}s. Door lines on Floor 1 are unstable.`,
     );
   } else if (game.anomaly && game.anomaly.floor === game.player.floor) {
     helpText.textContent = langText(
@@ -4198,13 +4586,14 @@ function randomRange(min, max) {
 }
 
 function awardRunRewards(escaped) {
-  const beforeTier = computeUnlockTier(state.meta.shards || 0);
+  const beforeTier = computeUnlockTier(state.meta.archiveXp ?? state.meta.shards ?? 0);
   const timeBonus = Math.min(3, Math.floor(game.time / 75));
   const shardsEarned = escaped
     ? CONFIG.meta.shardEscapeBase + timeBonus
     : CONFIG.meta.shardFailBase + Math.min(2, Math.floor(game.time / 90));
   state.meta.shards = (state.meta.shards || 0) + shardsEarned;
-  state.meta.unlockTier = computeUnlockTier(state.meta.shards);
+  state.meta.archiveXp = (state.meta.archiveXp || 0) + shardsEarned;
+  state.meta.unlockTier = computeUnlockTier(state.meta.archiveXp);
   pushLog(langText(`잔재 ${shardsEarned}개를 확보했습니다.`, `Secured ${shardsEarned} shards.`));
   if (state.meta.unlockTier > beforeTier) {
     showBanner(
@@ -4221,19 +4610,25 @@ function loadMeta() {
   try {
     const raw = localStorage.getItem("night-shift-escape-meta");
     if (!raw) {
-      return { runs: 0, escapes: 0, bestTime: 0, shards: 0, unlockTier: 0 };
+      return { runs: 0, escapes: 0, bestTime: 0, shards: 0, archiveXp: 0, unlockTier: 0, unlockedNodes: [], selectedNodes: [] };
     }
     const parsed = JSON.parse(raw);
     const shards = parsed.shards || 0;
+    const archiveXp = parsed.archiveXp ?? parsed.shards ?? 0;
     return {
       runs: parsed.runs || 0,
       escapes: parsed.escapes || 0,
       bestTime: parsed.bestTime || 0,
       shards,
-      unlockTier: computeUnlockTier(shards),
+      archiveXp,
+      unlockTier: computeUnlockTier(archiveXp),
+      unlockedNodes: Array.isArray(parsed.unlockedNodes) ? parsed.unlockedNodes.filter((id) => META_TREE.some((node) => node.id === id)) : [],
+      selectedNodes: Array.isArray(parsed.selectedNodes)
+        ? parsed.selectedNodes.filter((id) => META_TREE.some((node) => node.id === id)).slice(0, getMetaSelectionLimit({ archiveXp }))
+        : [],
     };
   } catch {
-    return { runs: 0, escapes: 0, bestTime: 0, shards: 0, unlockTier: 0 };
+    return { runs: 0, escapes: 0, bestTime: 0, shards: 0, archiveXp: 0, unlockTier: 0, unlockedNodes: [], selectedNodes: [] };
   }
 }
 
@@ -4358,7 +4753,10 @@ function updateAmbientAudio() {
   const now = context.currentTime;
   const danger = dangerLevel();
   const pausedFactor = state.paused || state.titleVisible ? 0.25 : 1;
-  const suppressionFactor = game.suppressionTime > 0 ? 0.18 : 0;
+  const suppressionFactor =
+    (game.suppressionTime > 0 ? 0.18 : 0) +
+    (game.floorHazards.archiveLock > 0 ? 0.08 : 0) +
+    (game.floorHazards.powerSurge > 0 ? 0.06 : 0);
   const floorFactor = game.player.floor === "f2" ? 1 : 0;
   const targetGain = state.audio.muted ? 0.0001 : (0.012 + danger * 0.028 + suppressionFactor) * pausedFactor;
   const targetFilter = game.blackoutActive ? 260 : 380 + danger * 260 + floorFactor * 110;
