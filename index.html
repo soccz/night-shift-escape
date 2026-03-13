@@ -26,48 +26,50 @@
 
       <main class="layout">
         <section class="viewport">
-          <div class="alarm-strip" id="alarmStrip">구역 상태 불안정. 확률이 곧 법칙이다.</div>
-          <canvas id="gameCanvas" width="1360" height="820"></canvas>
-          <div class="title-overlay" id="titleOverlay">
-            <div class="title-card">
-              <p class="title-kicker" id="titleKicker">Night Protocol</p>
-              <h2 id="titleOverlayHeading">격리 구역 진입</h2>
-              <p class="title-copy" id="titleOverlayCopy">
-                빈 방을 점거하고, 확률을 조작하듯 버티고, 정전을 견디고, 복도가 네 이름을 기억하기 전에 탈출하세요.
-              </p>
-              <button id="startButton" type="button">작전 시작</button>
-            </div>
-          </div>
-          <div class="overlay-card" id="statusCard">
-            <h2 id="missionHeading">임무 피드</h2>
-            <p id="objectiveText"></p>
-            <p id="promptText"></p>
-          </div>
-          <div class="quick-help" id="quickHelpCard">
-            <h2 id="helpHeading">빠른 도움말</h2>
-            <p id="helpText"></p>
-          </div>
-          <div class="pause-overlay hidden" id="pauseOverlay">
-            <div class="pause-card">
-              <p class="title-kicker" id="pauseKicker">System Hold</p>
-              <h2 id="pauseHeading">일시 정지</h2>
-              <p id="pauseCopy">정비하고 다시 들어가세요.</p>
-              <div class="pause-actions">
-                <button id="resumeButton" type="button">계속</button>
-                <button id="pauseMuteButton" type="button">사운드</button>
+          <div class="stage" id="gameStage">
+            <div class="alarm-strip" id="alarmStrip">구역 상태 불안정. 확률이 곧 법칙이다.</div>
+            <canvas id="gameCanvas" width="1360" height="820"></canvas>
+            <div class="title-overlay" id="titleOverlay">
+              <div class="title-card">
+                <p class="title-kicker" id="titleKicker">Night Protocol</p>
+                <h2 id="titleOverlayHeading">격리 구역 진입</h2>
+                <p class="title-copy" id="titleOverlayCopy">
+                  빈 방을 점거하고, 확률을 조작하듯 버티고, 정전을 견디고, 복도가 네 이름을 기억하기 전에 탈출하세요.
+                </p>
+                <button id="startButton" type="button">작전 시작</button>
               </div>
             </div>
-          </div>
-          <div class="mobile-stick" id="mobileStick">
-            <div class="stick-base">
-              <div class="stick-ring"></div>
-              <div class="stick-thumb" id="mobileStickThumb"></div>
+            <div class="overlay-card" id="statusCard">
+              <h2 id="missionHeading">임무 피드</h2>
+              <p id="objectiveText"></p>
+              <p id="promptText"></p>
             </div>
-          </div>
-          <div class="mobile-dock" id="mobileDock">
-            <button id="dockModeButton" type="button">이동 전환</button>
-            <button id="dockInteractButton" type="button">상호작용</button>
-            <button id="dockReinforceButton" type="button">문 강화</button>
+            <div class="quick-help" id="quickHelpCard">
+              <h2 id="helpHeading">빠른 도움말</h2>
+              <p id="helpText"></p>
+            </div>
+            <div class="pause-overlay hidden" id="pauseOverlay">
+              <div class="pause-card">
+                <p class="title-kicker" id="pauseKicker">System Hold</p>
+                <h2 id="pauseHeading">일시 정지</h2>
+                <p id="pauseCopy">정비하고 다시 들어가세요.</p>
+                <div class="pause-actions">
+                  <button id="resumeButton" type="button">계속</button>
+                  <button id="pauseMuteButton" type="button">사운드</button>
+                </div>
+              </div>
+            </div>
+            <div class="mobile-stick" id="mobileStick">
+              <div class="stick-base">
+                <div class="stick-ring"></div>
+                <div class="stick-thumb" id="mobileStickThumb"></div>
+              </div>
+            </div>
+            <div class="mobile-dock" id="mobileDock">
+              <button id="dockModeButton" type="button">이동 전환</button>
+              <button id="dockInteractButton" type="button">상호작용</button>
+              <button id="dockReinforceButton" type="button">문 강화</button>
+            </div>
           </div>
         </section>
 

@@ -2,6 +2,7 @@
 
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
+const stageEl = document.getElementById("gameStage");
 
 const statsEl = document.getElementById("stats");
 const metaEl = document.getElementById("meta");
@@ -44,6 +45,7 @@ const sidebar = document.getElementById("sidebar");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
+const STAGE_RATIO = WIDTH / HEIGHT;
 
 const I18N = {
   ko: {
@@ -1178,8 +1180,8 @@ function createGame() {
   world.exitRoom.gate.closed = true;
 
   const player = {
-    x: 1040,
-    y: 520,
+    x: world.hall.x + world.hall.w / 2,
+    y: world.hall.y + world.hall.h / 2 + 28,
     floor: "f1",
     radius: 12,
     hp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
@@ -1190,23 +1192,25 @@ function createGame() {
     holdingRepair: 0,
     lastSafeHeal: 0,
     lastDamageSource: "unknown",
+    spawnShield: 5,
   };
 
   const hunter = {
-    x: 1040,
-    y: 430,
+    x: world.hall.x + 180,
+    y: world.hall.y + 82,
     floor: "f1",
     radius: 16,
     hp: (CONFIG.hunter.baseHp + CONFIG.hunter.hpPerLevel) * runProfile.modifiers.hunterHpMultiplier,
     targetRoomId: null,
-    targetX: 1040,
-    targetY: 520,
+    targetX: world.hall.x + world.hall.w / 2,
+    targetY: world.hall.y + world.hall.h / 2,
     speed: 72,
     attackCooldown: 0,
     retargetTimer: 0,
     level: 1,
     mode: "stalk",
     modeTimer: 0,
+    wakeDelay: 4.5,
     skillCooldown: randomRange(
       HUNTER_SKILLS[runProfile.hunter.id].cooldownMin,
       HUNTER_SKILLS[runProfile.hunter.id].cooldownMax,
@@ -1553,10 +1557,14 @@ window.addEventListener("keydown", (event) => {
   }
 
   keys.add(event.key.toLowerCase());
+  keys.add(event.key);
+  keys.add(event.code);
 });
 
 window.addEventListener("keyup", (event) => {
   keys.delete(event.key.toLowerCase());
+  keys.delete(event.key);
+  keys.delete(event.code);
 });
 
 canvas.addEventListener("click", (event) => {
@@ -1624,6 +1632,7 @@ window.addEventListener("resize", () => {
     state.sidebarCollapsed = false;
     applyStaticText();
   }
+  syncStageLayout();
 });
 
 mobileStick.addEventListener("pointerdown", handleStickPointerDown);
@@ -2173,6 +2182,8 @@ function update(dt) {
   game.floorHazards.powerSurge = Math.max(0, game.floorHazards.powerSurge - dt);
   game.floorHazards.archiveLock = Math.max(0, game.floorHazards.archiveLock - dt);
   game.intelNoise = Math.max(0, game.intelNoise - dt);
+  game.player.spawnShield = Math.max(0, game.player.spawnShield - dt);
+  game.hunter.wakeDelay = Math.max(0, game.hunter.wakeDelay - dt);
   state.screenShake = Math.max(0, state.screenShake - dt * CONFIG.feedback.shakeDecayPerSecond);
   updateEffects(dt);
   updateBanner(dt);
@@ -2208,16 +2219,16 @@ function updatePlayer(dt) {
     dx = state.touchStick.dx;
     dy = state.touchStick.dy;
   } else if (state.movementMode === "wasd") {
-    if (keys.has("w")) {
+    if (isMovePressed("up")) {
       dy -= 1;
     }
-    if (keys.has("s")) {
+    if (isMovePressed("down")) {
       dy += 1;
     }
-    if (keys.has("a")) {
+    if (isMovePressed("left")) {
       dx -= 1;
     }
-    if (keys.has("d")) {
+    if (isMovePressed("right")) {
       dx += 1;
     }
     const len = Math.hypot(dx, dy);
@@ -2241,7 +2252,7 @@ function updatePlayer(dt) {
   moveEntity(player, dx * speed * dt, dy * speed * dt);
   player.roomId = getRoomAt(player.x, player.y)?.id || null;
 
-  if (game.blackoutActive && distance(player, world.generator) < 46 && keys.has("e")) {
+  if (game.blackoutActive && distance(player, world.generator) < 46 && isActionPressed("interact")) {
     player.holdingRepair += dt;
     if (player.holdingRepair >= 2.2 * game.runProfile.modifiers.repairDurationMultiplier) {
       repairGenerator();
@@ -2469,6 +2480,11 @@ function updateUnits(dt) {
 
 function updateHunter(dt) {
   const hunter = game.hunter;
+  if (hunter.wakeDelay > 0) {
+    hunterSeekPoint(world.hall.x + 180, world.hall.y + 82);
+    moveEntityWithPath(hunter, hunter.targetX, hunter.targetY, CONFIG.hunter.baseSpeed * 0.4 * dt);
+    return;
+  }
   hunter.level = 1 + Math.floor(game.time / 55) + Math.floor(game.fragments / 2) + countBreaches();
   updateHunterMode(dt);
   const modeModifiers = hunterModeProfile();
@@ -2786,6 +2802,9 @@ function handleHunterDoorDamage() {
 }
 
 function handleHunterAttacks() {
+  if (game.player.spawnShield > 0) {
+    return;
+  }
   if (game.hunter.floor === game.player.floor && distance(game.hunter, game.player) < 24 && game.hunter.attackCooldown <= 0) {
     const mode = hunterModeProfile();
     game.hunter.attackCooldown = 0.65 * mode.cooldown;
@@ -2855,7 +2874,7 @@ function updateInfected(dt) {
       enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt);
     }
 
-    if (distance(enemy, game.player) < 18) {
+    if (game.player.spawnShield <= 0 && distance(enemy, game.player) < 18) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = profile.cooldown;
@@ -4024,14 +4043,24 @@ function drawCharacter(entity, kind) {
   if (kind === "player") {
     ctx.save();
     ctx.strokeStyle = "rgba(133, 216, 255, 0.95)";
-    ctx.lineWidth = 3.2;
+    ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.arc(drawX, drawY, radius + 9 + Math.sin(game.time * 3.8) * 1.4, 0, Math.PI * 2);
+    ctx.arc(drawX, drawY, radius + 12 + Math.sin(game.time * 3.8) * 1.8, 0, Math.PI * 2);
     ctx.stroke();
-    drawPulseRing(drawX, drawY, radius + 15 + Math.sin(game.time * 4.8) * 2, "rgba(133, 216, 255, 0.18)");
+    drawPulseRing(drawX, drawY, radius + 20 + Math.sin(game.time * 4.8) * 2.8, "rgba(133, 216, 255, 0.22)");
+    if (entity.spawnShield > 0) {
+      drawPulseRing(drawX, drawY, radius + 28 + Math.sin(game.time * 7.2) * 3, "rgba(255, 221, 111, 0.28)");
+    }
     ctx.fillStyle = "#f5fbff";
-    ctx.font = "700 12px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-    ctx.fillText(t("player_tag"), drawX - 10, drawY - radius - 14);
+    ctx.font = "700 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+    ctx.fillText(t("player_tag"), drawX - 14, drawY - radius - 18);
+    ctx.beginPath();
+    ctx.moveTo(drawX, drawY - radius - 18);
+    ctx.lineTo(drawX - 8, drawY - radius - 34);
+    ctx.lineTo(drawX + 8, drawY - radius - 34);
+    ctx.closePath();
+    ctx.fillStyle = entity.spawnShield > 0 ? "#ffd46d" : "#85d8ff";
+    ctx.fill();
     ctx.restore();
   } else if (kind === "hunter") {
     drawPulseRing(drawX, drawY, radius + 18 + Math.sin(game.time * 6.4) * 3, "rgba(255, 92, 132, 0.16)");
@@ -4565,6 +4594,42 @@ function pointInRect(x, y, rect) {
   return x >= rect.x && y >= rect.y && x <= rect.x + rect.w && y <= rect.y + rect.h;
 }
 
+function isMovePressed(direction) {
+  const mapping = {
+    up: ["w", "W", "KeyW", "ArrowUp", "ㅈ"],
+    down: ["s", "S", "KeyS", "ArrowDown", "ㄴ"],
+    left: ["a", "A", "KeyA", "ArrowLeft", "ㅁ"],
+    right: ["d", "D", "KeyD", "ArrowRight", "ㅇ"],
+  };
+  return mapping[direction].some((key) => keys.has(key));
+}
+
+function isActionPressed(action) {
+  const mapping = {
+    interact: ["e", "E", "KeyE", "Enter"],
+  };
+  return (mapping[action] || []).some((key) => keys.has(key));
+}
+
+function syncStageLayout() {
+  if (!stageEl) {
+    return;
+  }
+  const viewportRect = stageEl.parentElement.getBoundingClientRect();
+  const availableWidth = Math.max(320, viewportRect.width);
+  const availableHeight = Math.max(260, window.innerHeight - viewportRect.top - 18);
+  let width = availableWidth;
+  let height = width / STAGE_RATIO;
+
+  if (height > availableHeight) {
+    height = availableHeight;
+    width = height * STAGE_RATIO;
+  }
+
+  stageEl.style.width = `${width}px`;
+  stageEl.style.height = `${height}px`;
+}
+
 function circleIntersectsRect(x, y, radius, rect) {
   const nearestX = clamp(x, rect.x, rect.x + rect.w);
   const nearestY = clamp(y, rect.y, rect.y + rect.h);
@@ -4802,6 +4867,7 @@ if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) {
 }
 
 applyStaticText();
+syncStageLayout();
 pushLog(langText("빈 방을 점거하고, 운을 뚫으며 탈출하세요.", "Find a vacant room, then build enough luck to escape."));
 announceRunSetup();
 requestAnimationFrame(loop);

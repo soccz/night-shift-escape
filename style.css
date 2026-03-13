@@ -190,6 +190,14 @@ button:hover {
   overflow: hidden;
 }
 
+.stage {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 1360 / 820;
+  margin: 0 auto;
+}
+
 .viewport::before {
   content: "";
   position: absolute;
@@ -286,9 +294,9 @@ button:hover {
   max-width: 44ch;
 }
 
-canvas {
+.stage canvas {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
   border-radius: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
