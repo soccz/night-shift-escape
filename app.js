@@ -3629,6 +3629,10 @@ function drawAtmosphere() {
 }
 
 function drawZones() {
+  const ownedRoom = getOwnedRoom();
+  const localOwnedRoom = ownedRoom && ownedRoom.floor === game.player.floor ? ownedRoom : null;
+  const nearbyPrompt = getPrompt();
+
   for (const zone of world.zones) {
     if (zone.floor !== game.player.floor) {
       continue;
@@ -3656,11 +3660,12 @@ function drawZones() {
     if (room.floor !== game.player.floor) {
       continue;
     }
-    drawCelOrb(room.bed.x, room.bed.y, room.bed.radius, colors.bed, "#e6fdff", 0.18);
-    drawCelOrb(room.altar.x, room.altar.y, room.altar.radius, colors.altar, "#ffd0b8", 0.12);
-    drawCelOrb(room.terminal.x, room.terminal.y, room.terminal.radius, colors.terminal, "#b8efff", 0.12);
+    const playerRoom = room.owner === "player";
+    drawBedFixture(room.bed.x, room.bed.y, 1, playerRoom || nearbyPrompt?.type === "claim");
+    drawAltarFixture(room.altar.x, room.altar.y, 1, localOwnedRoom?.id === room.id && nearbyPrompt?.type === "summon");
+    drawTerminalFixture(room.terminal.x, room.terminal.y, 1, localOwnedRoom?.id === room.id && nearbyPrompt?.type === "intel");
 
-    if (room.owner === "player") {
+    if (playerRoom) {
       ctx.strokeStyle = "rgba(133, 216, 255, 0.8)";
       ctx.lineWidth = 3.5;
       ctx.strokeRect(room.x + 4, room.y + 4, room.w - 8, room.h - 8);
@@ -3675,10 +3680,25 @@ function drawZones() {
     ctx.font = "700 13px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
     ctx.letterSpacing = "1px";
     ctx.fillText(room.label.toUpperCase(), room.x + 14, room.y + 22);
+
+    if (!room.owner && distance(game.player, room.bed) < 90) {
+      drawWorldLabel(room.bed.x, room.bed.y - 34, langText("빈 침대", "Vacant Bed"), "rgba(133, 216, 255, 0.95)");
+    } else if (playerRoom && distance(game.player, room.bed) < 96) {
+      drawWorldLabel(room.bed.x, room.bed.y - 34, langText("침대: 회복 + 추가 수익", "Bed: heal + bonus gold"), "rgba(111, 229, 255, 0.95)");
+    }
+    if (playerRoom && distance(game.player, room.altar) < 88) {
+      drawWorldLabel(room.altar.x, room.altar.y - 32, langText("제단: 수호자 소환", "Altar: summon"), "rgba(255, 199, 143, 0.95)");
+    }
+    if (playerRoom && distance(game.player, room.terminal) < 88) {
+      drawWorldLabel(room.terminal.x, room.terminal.y - 32, langText("단말: 지도 정보", "Terminal: intel"), "rgba(143, 232, 255, 0.95)");
+    }
   }
 
   if (world.generatorRoom.floor === game.player.floor) {
-    drawCelOrb(world.generator.x, world.generator.y, world.generator.radius, colors.generator, "#f8f7bf", 0.15);
+    drawGeneratorFixture(world.generator.x, world.generator.y, 1.05, nearbyPrompt?.type === "generator");
+    if (distance(game.player, world.generator) < 110) {
+      drawWorldLabel(world.generator.x, world.generator.y - 44, langText("발전기", "Generator"), "rgba(255, 232, 141, 0.95)");
+    }
   }
   if (world.exitRoom.floor === game.player.floor) {
     drawCelOrb(world.exitRoom.x + 68, world.exitRoom.y + 70, 24, colors.exit, "#ddf5ff", 0.15);
@@ -3688,10 +3708,15 @@ function drawZones() {
     if (elevator.floor !== game.player.floor) {
       continue;
     }
-    drawCelOrb(elevator.x, elevator.y, elevator.radius, "#4f4c78", "#ddf5ff", 0.15);
-    ctx.strokeStyle = "rgba(221, 245, 255, 0.42)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(elevator.x - 18, elevator.y - 18, 36, 36);
+    drawElevatorFixture(elevator.x, elevator.y, 1, nearbyPrompt?.type === "elevator" && nearbyPrompt.elevator?.id === elevator.id);
+    if (distance(game.player, elevator) < 84) {
+      drawWorldLabel(
+        elevator.x,
+        elevator.y - 34,
+        langText(elevator.destinationFloor === "f2" ? "엘리베이터: 2층" : "엘리베이터: 1층", elevator.destinationFloor === "f2" ? "Elevator: Floor 2" : "Elevator: Floor 1"),
+        "rgba(218, 222, 255, 0.95)",
+      );
+    }
   }
 
   if (game.anomaly && game.anomaly.floor === game.player.floor) {
@@ -3700,6 +3725,199 @@ function drawZones() {
     drawPulseRing(game.anomaly.x, game.anomaly.y, pulse, "rgba(212, 149, 255, 0.28)");
     drawPulseRing(game.anomaly.x, game.anomaly.y, pulse + 12, "rgba(255, 221, 111, 0.18)");
   }
+}
+
+function roundedRectPath(x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  ctx.lineTo(x + radius, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+  ctx.lineTo(x, y + radius);
+  ctx.quadraticCurveTo(x, y, x + radius, y);
+  ctx.closePath();
+}
+
+function drawBedFixture(x, y, scale = 1, highlight = false) {
+  const w = 48 * scale;
+  const h = 26 * scale;
+  drawShadow(x, y + 18 * scale, 34 * scale, 0.2);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = "rgba(122, 84, 61, 0.95)";
+  ctx.fillRect(-w / 2 - 2, -h / 2 + 3, 6, h - 2);
+  ctx.fillRect(w / 2 - 4, -h / 2 + 3, 6, h - 2);
+  ctx.fillRect(-w / 2 - 2, h / 2 - 1, w + 4, 5);
+
+  roundedRectPath(-w / 2, -h / 2, w, h, 7 * scale);
+  ctx.fillStyle = "#dde9f3";
+  ctx.fill();
+  ctx.strokeStyle = highlight ? "rgba(133, 216, 255, 0.95)" : "rgba(34, 47, 61, 0.9)";
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+
+  roundedRectPath(-w / 2 + 2, -h / 2 + 8, w - 4, h - 10, 6 * scale);
+  ctx.fillStyle = "#77b6df";
+  ctx.fill();
+
+  roundedRectPath(-w / 2 + 5, -h / 2 + 2, 16 * scale, 9 * scale, 4 * scale);
+  ctx.fillStyle = "#f5fbff";
+  ctx.fill();
+
+  if (highlight) {
+    drawPulseRing(0, 0, 30 * scale + Math.sin(game.time * 4) * 2, "rgba(133, 216, 255, 0.26)");
+  }
+  ctx.restore();
+}
+
+function drawAltarFixture(x, y, scale = 1, highlight = false) {
+  drawShadow(x, y + 14 * scale, 28 * scale, 0.18);
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = "#3d2a25";
+  ctx.beginPath();
+  ctx.moveTo(0, -22 * scale);
+  ctx.lineTo(22 * scale, -6 * scale);
+  ctx.lineTo(15 * scale, 18 * scale);
+  ctx.lineTo(-15 * scale, 18 * scale);
+  ctx.lineTo(-22 * scale, -6 * scale);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = highlight ? "rgba(255, 204, 157, 0.95)" : "rgba(27, 18, 17, 0.95)";
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(255, 182, 129, 0.78)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-10 * scale, -2 * scale);
+  ctx.lineTo(0, -12 * scale);
+  ctx.lineTo(10 * scale, -2 * scale);
+  ctx.lineTo(0, 10 * scale);
+  ctx.closePath();
+  ctx.stroke();
+
+  ctx.fillStyle = "#ffd1ab";
+  ctx.beginPath();
+  ctx.arc(0, -10 * scale, 4.5 * scale + Math.sin(game.time * 5) * 0.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawTerminalFixture(x, y, scale = 1, highlight = false) {
+  drawShadow(x, y + 14 * scale, 26 * scale, 0.18);
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.fillStyle = "#202f39";
+  roundedRectPath(-17 * scale, -20 * scale, 34 * scale, 28 * scale, 5 * scale);
+  ctx.fill();
+  ctx.strokeStyle = highlight ? "rgba(143, 232, 255, 0.98)" : "rgba(16, 20, 28, 0.96)";
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  ctx.fillStyle = "#8cecff";
+  roundedRectPath(-12 * scale, -15 * scale, 24 * scale, 14 * scale, 3 * scale);
+  ctx.fill();
+
+  ctx.fillStyle = "rgba(140, 236, 255, 0.22)";
+  ctx.fillRect(-9 * scale, 3 * scale, 18 * scale, 3 * scale);
+  ctx.fillRect(-2 * scale, 8 * scale, 4 * scale, 11 * scale);
+
+  ctx.strokeStyle = "rgba(178, 246, 255, 0.85)";
+  ctx.beginPath();
+  ctx.moveTo(-8 * scale, -8 * scale);
+  ctx.lineTo(0, -4 * scale);
+  ctx.lineTo(8 * scale, -8 * scale);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawGeneratorFixture(x, y, scale = 1, highlight = false) {
+  drawShadow(x, y + 22 * scale, 42 * scale, 0.24);
+  ctx.save();
+  ctx.translate(x, y);
+
+  roundedRectPath(-34 * scale, -24 * scale, 68 * scale, 48 * scale, 8 * scale);
+  ctx.fillStyle = "#5e6240";
+  ctx.fill();
+  ctx.strokeStyle = highlight ? "rgba(255, 233, 140, 0.98)" : "rgba(29, 31, 16, 0.95)";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = "#1b2216";
+  roundedRectPath(-24 * scale, -14 * scale, 24 * scale, 18 * scale, 4 * scale);
+  ctx.fill();
+  ctx.fillStyle = "#ffef8c";
+  ctx.fillRect(8 * scale, -12 * scale, 12 * scale, 8 * scale);
+  ctx.fillStyle = "#d0e870";
+  ctx.fillRect(8 * scale, 0, 18 * scale, 10 * scale);
+
+  ctx.strokeStyle = "rgba(255, 244, 180, 0.78)";
+  ctx.beginPath();
+  ctx.moveTo(-12 * scale, -30 * scale);
+  ctx.lineTo(-4 * scale, -24 * scale);
+  ctx.lineTo(-10 * scale, -18 * scale);
+  ctx.moveTo(8 * scale, -30 * scale);
+  ctx.lineTo(16 * scale, -24 * scale);
+  ctx.lineTo(10 * scale, -18 * scale);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawElevatorFixture(x, y, scale = 1, highlight = false) {
+  const pulse = Math.sin(game.time * 3.8) * 1.2;
+  drawShadow(x, y + 14 * scale, 28 * scale, 0.18);
+  ctx.save();
+  ctx.translate(x, y);
+
+  ctx.strokeStyle = highlight ? "rgba(215, 221, 255, 0.98)" : "rgba(160, 169, 218, 0.72)";
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 20 * scale + pulse, 0, Math.PI * 2);
+  ctx.stroke();
+
+  roundedRectPath(-14 * scale, -14 * scale, 28 * scale, 28 * scale, 5 * scale);
+  ctx.fillStyle = "#383850";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(221, 245, 255, 0.55)";
+  ctx.stroke();
+
+  ctx.fillStyle = "#eff6ff";
+  ctx.beginPath();
+  ctx.moveTo(0, -7 * scale);
+  ctx.lineTo(7 * scale, 3 * scale);
+  ctx.lineTo(3 * scale, 3 * scale);
+  ctx.lineTo(3 * scale, 8 * scale);
+  ctx.lineTo(-3 * scale, 8 * scale);
+  ctx.lineTo(-3 * scale, 3 * scale);
+  ctx.lineTo(-7 * scale, 3 * scale);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawWorldLabel(x, y, text, color) {
+  ctx.save();
+  ctx.font = "700 12px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+  const width = ctx.measureText(text).width + 18;
+  roundedRectPath(x - width / 2, y - 12, width, 22, 10);
+  ctx.fillStyle = "rgba(10, 14, 24, 0.86)";
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = "#f7fbff";
+  ctx.fillText(text, x - width / 2 + 9, y + 3);
+  ctx.restore();
 }
 
 function drawKeycards() {
