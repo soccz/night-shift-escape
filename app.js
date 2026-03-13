@@ -1500,16 +1500,18 @@ dockReinforceButton.addEventListener("click", () => {
 
 window.addEventListener("keydown", (event) => {
   ensureAudio();
+  const key = event.key.toLowerCase();
+  const code = event.code;
 
   if (state.titleVisible) {
-    const launchKeys = new Set(["enter", " ", "w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
-    if (launchKeys.has(event.key.toLowerCase())) {
+    const launchKeys = new Set(["enter", " ", "w", "a", "s", "d", "e", "arrowup", "arrowdown", "arrowleft", "arrowright", "KeyW", "KeyA", "KeyS", "KeyD", "KeyE"]);
+    if (launchKeys.has(key) || launchKeys.has(code)) {
       event.preventDefault();
       startRun();
     }
   }
 
-  if (event.key === "Escape" || event.key.toLowerCase() === "p") {
+  if (event.key === "Escape" || key === "p" || code === "KeyP") {
     event.preventDefault();
     togglePause();
     return;
@@ -1523,7 +1525,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.code === CONFIG.admin.toggleCode) {
+  if (code === CONFIG.admin.toggleCode) {
     event.preventDefault();
     state.adminMode = !state.adminMode;
     pushLog(state.lang === "ko" ? `운영자 모드 ${state.adminMode ? "활성화" : "비활성화"}.` : `Admin mode ${state.adminMode ? "enabled" : "disabled"}.`);
@@ -1531,7 +1533,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.code === CONFIG.admin.payoutCode) {
+  if (code === CONFIG.admin.payoutCode) {
     if (state.adminMode) {
       addGold(CONFIG.admin.payoutAmount);
       pushLog(state.lang === "ko" ? `운영자 자금 투입: +${CONFIG.admin.payoutAmount} 골드.` : `Admin cache injected: +${CONFIG.admin.payoutAmount} gold.`);
@@ -1543,17 +1545,19 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key.toLowerCase() === "e") {
+  if (key === "e" || code === "KeyE" || code === "Enter") {
     if (state.paused) {
       return;
     }
+    event.preventDefault();
     triggerInteract();
   }
 
-  if (event.key.toLowerCase() === "r") {
+  if (key === "r" || code === "KeyR") {
     if (state.paused) {
       return;
     }
+    event.preventDefault();
     attemptReinforce();
   }
 
@@ -2060,7 +2064,7 @@ function getPrompt() {
     };
   }
 
-  if (room && !room.owner && distance(player, room.bed) < 42) {
+  if (room && !room.owner) {
     return { type: "claim", room, text: t("prompt_claim") };
   }
 
