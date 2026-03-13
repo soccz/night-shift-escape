@@ -17,6 +17,8 @@
         <div class="header-actions">
           <button id="languageButton" type="button">KO</button>
           <div class="theme-chip" id="themeChip">Cel Horror HUD</div>
+          <button id="muteButton" type="button">사운드</button>
+          <button id="pauseButton" type="button">일시정지</button>
           <button id="restartButton" type="button">다시 시작</button>
         </div>
       </header>
@@ -39,6 +41,27 @@
             <h2 id="missionHeading">임무 피드</h2>
             <p id="objectiveText"></p>
             <p id="promptText"></p>
+          </div>
+          <div class="quick-help" id="quickHelpCard">
+            <h2 id="helpHeading">빠른 도움말</h2>
+            <p id="helpText"></p>
+          </div>
+          <div class="pause-overlay hidden" id="pauseOverlay">
+            <div class="pause-card">
+              <p class="title-kicker" id="pauseKicker">System Hold</p>
+              <h2 id="pauseHeading">일시 정지</h2>
+              <p id="pauseCopy">정비하고 다시 들어가세요.</p>
+              <div class="pause-actions">
+                <button id="resumeButton" type="button">계속</button>
+                <button id="pauseMuteButton" type="button">사운드</button>
+              </div>
+            </div>
+          </div>
+          <div class="mobile-stick" id="mobileStick">
+            <div class="stick-base">
+              <div class="stick-ring"></div>
+              <div class="stick-thumb" id="mobileStickThumb"></div>
+            </div>
           </div>
           <div class="mobile-dock" id="mobileDock">
             <button id="dockModeButton" type="button">이동 전환</button>

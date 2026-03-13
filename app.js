@@ -24,9 +24,21 @@ const controlsList = document.getElementById("controlsList");
 const logHeading = document.getElementById("logHeading");
 const metaHeading = document.getElementById("metaHeading");
 const languageButton = document.getElementById("languageButton");
+const muteButton = document.getElementById("muteButton");
+const pauseButton = document.getElementById("pauseButton");
 const dockModeButton = document.getElementById("dockModeButton");
 const dockInteractButton = document.getElementById("dockInteractButton");
 const dockReinforceButton = document.getElementById("dockReinforceButton");
+const helpHeading = document.getElementById("helpHeading");
+const helpText = document.getElementById("helpText");
+const pauseOverlay = document.getElementById("pauseOverlay");
+const pauseKicker = document.getElementById("pauseKicker");
+const pauseHeading = document.getElementById("pauseHeading");
+const pauseCopy = document.getElementById("pauseCopy");
+const resumeButton = document.getElementById("resumeButton");
+const pauseMuteButton = document.getElementById("pauseMuteButton");
+const mobileStick = document.getElementById("mobileStick");
+const mobileStickThumb = document.getElementById("mobileStickThumb");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -35,6 +47,11 @@ const I18N = {
   ko: {
     subtitle: "브라우저용 애니 호러 솔로 디펜스 런.",
     themeChip: "셀 호러 HUD",
+    mute: "사운드",
+    mute_on: "사운드 켬",
+    mute_off: "사운드 끔",
+    pause: "일시정지",
+    resume: "계속",
     restart: "다시 시작",
     alarm: "구역 상태 불안정. 확률이 곧 법칙이다.",
     titleKicker: "Night Protocol",
@@ -47,6 +64,12 @@ const I18N = {
     controlsHeading: "조작",
     logHeading: "이벤트 로그",
     metaHeading: "기록",
+    helpHeading: "빠른 도움말",
+    helpText:
+      "방을 먼저 점거한 뒤 침대에서 자금을 벌고, 제단에서 소환하고, 단말에서 지도 조각을 사세요. 모바일은 왼쪽 스틱으로 이동하고 오른쪽 버튼으로 행동합니다.",
+    pauseKicker: "System Hold",
+    pauseHeading: "일시 정지",
+    pauseCopy: "정비하고 다시 들어가세요.",
     dock_mode: "이동 전환",
     dock_interact: "상호작용",
     dock_reinforce: "문 강화",
@@ -55,6 +78,7 @@ const I18N = {
       ["상호작용", "E"],
       ["문 강화", "R"],
       ["이동 방식 전환", "Tab"],
+      ["일시정지", "Esc / P"],
       ["운영자 모드", "F1"],
       ["운영자 자금", "Insert"],
     ],
@@ -98,6 +122,11 @@ const I18N = {
   en: {
     subtitle: "Anime-horror solo defense run for the browser.",
     themeChip: "Cel Horror HUD",
+    mute: "Sound",
+    mute_on: "Sound On",
+    mute_off: "Sound Off",
+    pause: "Pause",
+    resume: "Resume",
     restart: "Restart Run",
     alarm: "Ward state unstable. Probability is law.",
     titleKicker: "Night Protocol",
@@ -110,6 +139,12 @@ const I18N = {
     controlsHeading: "Controls",
     logHeading: "Event Log",
     metaHeading: "Meta",
+    helpHeading: "Quick Help",
+    helpText:
+      "Claim a room first, farm gold on the bed, summon at the altar, and buy map fragments at the terminal. On mobile, move with the left stick and use the right buttons for actions.",
+    pauseKicker: "System Hold",
+    pauseHeading: "Paused",
+    pauseCopy: "Take a breath and re-enter when ready.",
     dock_mode: "Move Mode",
     dock_interact: "Interact",
     dock_reinforce: "Reinforce",
@@ -118,6 +153,7 @@ const I18N = {
       ["Interact", "E"],
       ["Reinforce door", "R"],
       ["Toggle movement mode", "Tab"],
+      ["Pause", "Esc / P"],
       ["Admin mode", "F1"],
       ["Admin money", "Insert"],
     ],
@@ -445,6 +481,7 @@ const state = {
   meta: loadMeta(),
   nextUnitId: 1,
   adminMode: false,
+  paused: false,
   screenShake: 0,
   audio: createAudioState(),
   effects: [],
@@ -453,6 +490,12 @@ const state = {
   flash: null,
   outcomeText: "",
   lang: loadLanguage(),
+  touchStick: {
+    active: false,
+    pointerId: null,
+    dx: 0,
+    dy: 0,
+  },
 };
 
 const colors = {
@@ -863,7 +906,9 @@ function createGame() {
 }
 
 function resetGame() {
+  setPaused(false);
   state.clickTarget = null;
+  resetTouchStick();
   state.nextUnitId = 1;
   state.logs = [];
   state.screenShake = 0;
@@ -875,6 +920,90 @@ function resetGame() {
   pushLog(langText("런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요.", "Run reset. Claim a room and survive long enough to escape."));
   announceRunSetup();
   renderHud();
+}
+
+function setPaused(nextPaused) {
+  if ((state.titleVisible || game.phase !== "running") && nextPaused) {
+    return;
+  }
+  state.paused = nextPaused;
+  if (state.paused) {
+    keys.clear();
+    resetTouchStick();
+  }
+  pauseOverlay.classList.toggle("hidden", !state.paused);
+  pauseButton.textContent = state.paused ? t("resume") : t("pause");
+  applyStaticText();
+}
+
+function togglePause() {
+  if (state.titleVisible || game.phase !== "running") {
+    return;
+  }
+  setPaused(!state.paused);
+}
+
+function toggleMute() {
+  state.audio.muted = !state.audio.muted;
+  saveMutePreference(state.audio.muted);
+  applyStaticText();
+}
+
+function resetTouchStick() {
+  state.touchStick.active = false;
+  state.touchStick.pointerId = null;
+  state.touchStick.dx = 0;
+  state.touchStick.dy = 0;
+  mobileStickThumb.style.transform = "translate3d(0, 0, 0)";
+}
+
+function handleStickPointerDown(event) {
+  if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches) {
+    return;
+  }
+  ensureAudio();
+  if (state.titleVisible) {
+    startRun();
+  }
+  if (state.paused) {
+    return;
+  }
+  event.preventDefault();
+  state.touchStick.active = true;
+  state.touchStick.pointerId = event.pointerId;
+  updateTouchStickFromEvent(event);
+}
+
+function handleStickPointerMove(event) {
+  if (!state.touchStick.active || state.touchStick.pointerId !== event.pointerId) {
+    return;
+  }
+  event.preventDefault();
+  updateTouchStickFromEvent(event);
+}
+
+function handleStickPointerUp(event) {
+  if (!state.touchStick.active || state.touchStick.pointerId !== event.pointerId) {
+    return;
+  }
+  resetTouchStick();
+}
+
+function updateTouchStickFromEvent(event) {
+  const rect = mobileStick.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const maxRadius = rect.width * 0.27;
+  let dx = event.clientX - centerX;
+  let dy = event.clientY - centerY;
+  const len = Math.hypot(dx, dy) || 1;
+  if (len > maxRadius) {
+    dx = (dx / len) * maxRadius;
+    dy = (dy / len) * maxRadius;
+  }
+  state.touchStick.dx = dx / maxRadius;
+  state.touchStick.dy = dy / maxRadius;
+  mobileStickThumb.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
 }
 
 function startRun() {
@@ -904,6 +1033,8 @@ function applyStaticText() {
   document.documentElement.lang = state.lang;
   subtitleText.textContent = t("subtitle");
   themeChip.textContent = t("themeChip");
+  muteButton.textContent = state.audio.muted ? t("mute_off") : t("mute_on");
+  pauseButton.textContent = state.paused ? t("resume") : t("pause");
   restartButton.textContent = t("restart");
   alarmStrip.textContent = t("alarm");
   titleKicker.textContent = t("titleKicker");
@@ -915,6 +1046,13 @@ function applyStaticText() {
   controlsHeading.textContent = t("controlsHeading");
   logHeading.textContent = t("logHeading");
   metaHeading.textContent = t("metaHeading");
+  helpHeading.textContent = t("helpHeading");
+  helpText.textContent = t("helpText");
+  pauseKicker.textContent = t("pauseKicker");
+  pauseHeading.textContent = t("pauseHeading");
+  pauseCopy.textContent = t("pauseCopy");
+  resumeButton.textContent = t("resume");
+  pauseMuteButton.textContent = state.audio.muted ? t("mute_off") : t("mute_on");
   dockModeButton.textContent = t("dock_mode");
   dockInteractButton.textContent = t("dock_interact");
   dockReinforceButton.textContent = t("dock_reinforce");
@@ -927,6 +1065,14 @@ function applyStaticText() {
 restartButton.addEventListener("click", resetGame);
 startButton.addEventListener("click", startRun);
 languageButton.addEventListener("click", toggleLanguage);
+muteButton.addEventListener("click", toggleMute);
+pauseButton.addEventListener("click", () => {
+  togglePause();
+});
+resumeButton.addEventListener("click", () => {
+  setPaused(false);
+});
+pauseMuteButton.addEventListener("click", toggleMute);
 dockModeButton.addEventListener("click", () => {
   state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
   state.clickTarget = null;
@@ -958,6 +1104,12 @@ window.addEventListener("keydown", (event) => {
     }
   }
 
+  if (event.key === "Escape" || event.key.toLowerCase() === "p") {
+    event.preventDefault();
+    togglePause();
+    return;
+  }
+
   if (event.key === "Tab") {
     event.preventDefault();
     state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
@@ -987,10 +1139,16 @@ window.addEventListener("keydown", (event) => {
   }
 
   if (event.key.toLowerCase() === "e") {
+    if (state.paused) {
+      return;
+    }
     triggerInteract();
   }
 
   if (event.key.toLowerCase() === "r") {
+    if (state.paused) {
+      return;
+    }
     attemptReinforce();
   }
 
@@ -1006,6 +1164,9 @@ canvas.addEventListener("click", (event) => {
   if (state.titleVisible) {
     startRun();
   }
+  if (state.paused) {
+    return;
+  }
   if (state.movementMode !== "click") {
     return;
   }
@@ -1019,6 +1180,9 @@ canvas.addEventListener(
     ensureAudio();
     if (state.titleVisible) {
       startRun();
+    }
+    if (state.paused) {
+      return;
     }
     const touch = event.touches[0];
     if (!touch) {
@@ -1036,6 +1200,9 @@ canvas.addEventListener(
     if (state.titleVisible) {
       return;
     }
+    if (state.paused) {
+      return;
+    }
     const touch = event.touches[0];
     if (!touch) {
       return;
@@ -1045,6 +1212,17 @@ canvas.addEventListener(
   },
   { passive: false },
 );
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && !state.titleVisible && game.phase === "running") {
+    setPaused(true);
+  }
+});
+
+mobileStick.addEventListener("pointerdown", handleStickPointerDown);
+window.addEventListener("pointermove", handleStickPointerMove);
+window.addEventListener("pointerup", handleStickPointerUp);
+window.addEventListener("pointercancel", handleStickPointerUp);
 
 function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
@@ -1426,6 +1604,8 @@ function escapeRun() {
   if (world.exitRoom.gate.closed) {
     return;
   }
+  resetTouchStick();
+  setPaused(false);
   game.phase = "escaped";
   game.winFlash = 4;
   state.meta.runs += 1;
@@ -1443,6 +1623,8 @@ function failRun(reason) {
   if (game.phase !== "running") {
     return;
   }
+  resetTouchStick();
+  setPaused(false);
   game.phase = "failed";
   state.meta.runs += 1;
   state.meta.bestTime = Math.max(state.meta.bestTime, game.time);
@@ -1461,6 +1643,13 @@ function update(dt) {
     updateEffects(dt);
     updateBanner(dt);
     updateFlash(dt);
+    return;
+  }
+
+  if (state.paused) {
+    updateEffects(dt * 0.25);
+    updateBanner(dt * 0.25);
+    updateFlash(dt * 0.25);
     return;
   }
 
@@ -1504,7 +1693,10 @@ function updatePlayer(dt) {
   let dx = 0;
   let dy = 0;
 
-  if (state.movementMode === "wasd") {
+  if (state.touchStick.active) {
+    dx = state.touchStick.dx;
+    dy = state.touchStick.dy;
+  } else if (state.movementMode === "wasd") {
     if (keys.has("w")) {
       dy -= 1;
     }
@@ -3302,6 +3494,7 @@ function createAudioState() {
   return {
     context: null,
     unlocked: false,
+    muted: loadMutePreference(),
   };
 }
 
@@ -3326,7 +3519,7 @@ function ensureAudio() {
 }
 
 function playUiTone(frequency, duration, type, volume) {
-  if (!state.audio.unlocked || !state.audio.context) {
+  if (!state.audio.unlocked || !state.audio.context || state.audio.muted) {
     return;
   }
 
@@ -3344,6 +3537,20 @@ function playUiTone(frequency, duration, type, volume) {
   gain.connect(context.destination);
   oscillator.start(start);
   oscillator.stop(start + duration);
+}
+
+function loadMutePreference() {
+  try {
+    return localStorage.getItem("night-shift-escape-muted") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveMutePreference(muted) {
+  try {
+    localStorage.setItem("night-shift-escape-muted", muted ? "1" : "0");
+  } catch {}
 }
 
 function loop(now) {
