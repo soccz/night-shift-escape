@@ -72,7 +72,7 @@ const I18N = {
     metaHeading: "기록",
     helpHeading: "빠른 도움말",
     helpText:
-      "방을 먼저 점거한 뒤 침대에서 자금을 벌고, 제단에서 소환하고, 단말에서 지도 조각을 사세요. 모바일은 왼쪽 스틱으로 이동하고 오른쪽 버튼으로 행동합니다.",
+      "빈 방에 들어가 E를 눌러 점거하세요. 내 방 안에 있으면 돈이 돌고, 침대 위에 있으면 더 빨리 벌면서 회복합니다. 제단은 소환, 단말은 지도 조각입니다.",
     pauseKicker: "System Hold",
     pauseHeading: "일시 정지",
     pauseCopy: "정비하고 다시 들어가세요.",
@@ -85,7 +85,7 @@ const I18N = {
       ["문 강화", "R"],
       ["이동 방식 전환", "Tab"],
       ["일시정지", "Esc / P"],
-      ["운영자 모드", "F1"],
+      ["운영자 모드", "Q"],
       ["운영자 자금", "Insert"],
     ],
     stat_health: "체력",
@@ -122,14 +122,14 @@ const I18N = {
     room_none: "없음",
     movement_wasd: "키보드",
     movement_click: "포인트",
-    objective_findRoom: "빈 방을 찾아 점거하고, 추격자가 문을 기억하기 전에 자리를 잡으세요.",
-    objective_fragments: "침대에서 돈을 벌고, 수호자를 뽑고, 단말기에서 지도 조각을 도박처럼 수집하세요.",
+    objective_findRoom: "빈 방에 들어가 E를 눌러 점거하세요. 방을 내 것으로 만들면 돈이 돌기 시작합니다.",
+    objective_fragments: "내 방 안에 머물며 돈을 벌고, 침대 위에 서면 더 빨리 벌고 회복합니다. 그 돈으로 소환과 지도 조각을 사세요.",
     objective_sigils: "두 개의 시질을 회수해 서비스 게이트를 강제로 여세요.",
     objective_escape: "복도가 널 삼키기 전에 서비스 게이트로 달리세요.",
     prompt_none: "지금 당장 할 상호작용이 없습니다.",
     prompt_generator: "E를 누르고 유지해 발전기를 수리하세요.",
     prompt_escape: "E를 눌러 탈출하세요.",
-    prompt_claim: "E를 눌러 이 방을 점거하세요.",
+    prompt_claim: "E를 눌러 이 방을 점거하세요. 점거하면 돈이 생산됩니다.",
     prompt_summon: "E를 눌러 랜덤 수호자를 소환하세요.",
     prompt_intel: "E를 눌러 지도 정보를 도박처럼 구매하세요.",
     prompt_door: "E로 문 개폐, R로 문 강화.",
@@ -163,7 +163,7 @@ const I18N = {
     metaHeading: "Meta",
     helpHeading: "Quick Help",
     helpText:
-      "Claim a room first, farm gold on the bed, summon at the altar, and buy map fragments at the terminal. On mobile, move with the left stick and use the right buttons for actions.",
+      "Enter a vacant room and press E to claim it. Your room generates gold, and the bed boosts gold plus healing. The altar summons, and the terminal buys fragments.",
     pauseKicker: "System Hold",
     pauseHeading: "Paused",
     pauseCopy: "Take a breath and re-enter when ready.",
@@ -176,7 +176,7 @@ const I18N = {
       ["Reinforce door", "R"],
       ["Toggle movement mode", "Tab"],
       ["Pause", "Esc / P"],
-      ["Admin mode", "F1"],
+      ["Admin mode", "Q"],
       ["Admin money", "Insert"],
     ],
     stat_health: "Health",
@@ -213,14 +213,14 @@ const I18N = {
     room_none: "None",
     movement_wasd: "Keyboard",
     movement_click: "Point",
-    objective_findRoom: "Find a vacant room and bind it before the ward closes around you.",
-    objective_fragments: "Hold the room, harvest gold from the bed, and gamble for fragments at the terminal.",
+    objective_findRoom: "Enter a vacant room and press E to claim it. Claimed rooms start generating gold.",
+    objective_fragments: "Stay inside your room for income. Stand on the bed to earn faster and heal, then spend that gold on summons and fragments.",
     objective_sigils: "Recover both sigils and force the service gate to yield.",
     objective_escape: "Run for the service gate before the ward swallows you.",
     prompt_none: "No immediate interaction.",
     prompt_generator: "Hold E to repair the generator.",
     prompt_escape: "Press E to escape.",
-    prompt_claim: "Press E to claim this room.",
+    prompt_claim: "Press E to claim this room. Claimed rooms generate gold.",
     prompt_summon: "Press E to summon a random guardian.",
     prompt_intel: "Press E to gamble for map intel.",
     prompt_door: "Press E to open or close your door. Press R to reinforce.",
@@ -257,13 +257,14 @@ const CONFIG = {
     healPerSecondOnBed: 5,
   },
   admin: {
-    toggleKey: "f1",
-    payoutKey: "insert",
+    toggleCode: "KeyQ",
+    payoutCode: "Insert",
     payoutAmount: 250,
   },
   economy: {
     startingGold: 85,
-    goldPerSecondOnBed: 12,
+    goldPerSecondInRoom: 5,
+    goldPerSecondOnBedBonus: 7,
   },
   summon: {
     baseCost: 60,
@@ -1522,7 +1523,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key.toLowerCase() === CONFIG.admin.toggleKey) {
+  if (event.code === CONFIG.admin.toggleCode) {
     event.preventDefault();
     state.adminMode = !state.adminMode;
     pushLog(state.lang === "ko" ? `운영자 모드 ${state.adminMode ? "활성화" : "비활성화"}.` : `Admin mode ${state.adminMode ? "enabled" : "disabled"}.`);
@@ -1530,7 +1531,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key.toLowerCase() === CONFIG.admin.payoutKey) {
+  if (event.code === CONFIG.admin.payoutCode) {
     if (state.adminMode) {
       addGold(CONFIG.admin.payoutAmount);
       pushLog(state.lang === "ko" ? `운영자 자금 투입: +${CONFIG.admin.payoutAmount} 골드.` : `Admin cache injected: +${CONFIG.admin.payoutAmount} gold.`);
@@ -2268,8 +2269,12 @@ function updateEconomy(dt) {
     return;
   }
 
+  if (pointInRect(game.player.x, game.player.y, ownedRoom)) {
+    addGold(CONFIG.economy.goldPerSecondInRoom * game.runProfile.modifiers.goldGainMultiplier * dt);
+  }
+
   if (distance(game.player, ownedRoom.bed) < 34) {
-    addGold(CONFIG.economy.goldPerSecondOnBed * game.runProfile.modifiers.goldGainMultiplier * dt);
+    addGold(CONFIG.economy.goldPerSecondOnBedBonus * game.runProfile.modifiers.goldGainMultiplier * dt);
     game.player.hp = Math.min(game.player.maxHp, game.player.hp + CONFIG.player.healPerSecondOnBed * dt);
   }
 }
@@ -2292,7 +2297,7 @@ function updateHiders(dt) {
     ).length;
 
     const safeIncome =
-      CONFIG.economy.goldPerSecondOnBed *
+      (CONFIG.economy.goldPerSecondInRoom + CONFIG.economy.goldPerSecondOnBedBonus) *
       CONFIG.hider.goldGainMultiplier *
       game.runProfile.modifiers.hiderGoldMultiplier;
     hider.gold += safeIncome * dt * (localThreats > 0 || game.blackoutActive ? 0.18 : 1);
