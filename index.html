@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,30 +12,31 @@
         <div class="title-stack">
           <p class="eyebrow">Protocol A-13</p>
           <h1>Night Shift Escape</h1>
-          <p class="subtitle">Anime-horror solo defense run for the browser.</p>
+          <p class="subtitle" id="subtitleText">브라우저용 애니 호러 솔로 디펜스 런.</p>
         </div>
         <div class="header-actions">
-          <div class="theme-chip">Cel Horror HUD</div>
-          <button id="restartButton" type="button">Restart Run</button>
+          <button id="languageButton" type="button">KO</button>
+          <div class="theme-chip" id="themeChip">Cel Horror HUD</div>
+          <button id="restartButton" type="button">다시 시작</button>
         </div>
       </header>
 
       <main class="layout">
         <section class="viewport">
-          <div class="alarm-strip">Ward state unstable. Probability is law.</div>
+          <div class="alarm-strip" id="alarmStrip">구역 상태 불안정. 확률이 곧 법칙이다.</div>
           <canvas id="gameCanvas" width="1360" height="820"></canvas>
           <div class="title-overlay" id="titleOverlay">
             <div class="title-card">
-              <p class="title-kicker">Night Protocol</p>
-              <h2>Enter The Ward</h2>
-              <p class="title-copy">
-                Claim a room. Rig the odds. Survive the blackout. Escape before the corridor learns your name.
+              <p class="title-kicker" id="titleKicker">Night Protocol</p>
+              <h2 id="titleOverlayHeading">격리 구역 진입</h2>
+              <p class="title-copy" id="titleOverlayCopy">
+                빈 방을 점거하고, 확률을 조작하듯 버티고, 정전을 견디고, 복도가 네 이름을 기억하기 전에 탈출하세요.
               </p>
-              <button id="startButton" type="button">Start Operation</button>
+              <button id="startButton" type="button">작전 시작</button>
             </div>
           </div>
           <div class="overlay-card" id="statusCard">
-            <h2>Mission Feed</h2>
+            <h2 id="missionHeading">임무 피드</h2>
             <p id="objectiveText"></p>
             <p id="promptText"></p>
           </div>
@@ -43,29 +44,22 @@
 
         <aside class="sidebar">
           <section class="panel">
-            <h2>Run</h2>
+            <h2 id="runHeading">현재 런</h2>
             <div class="stats" id="stats"></div>
           </section>
 
           <section class="panel">
-            <h2>Controls</h2>
-            <ul class="controls">
-              <li><span>Move</span><strong>WASD / Click mode</strong></li>
-              <li><span>Interact</span><strong>E</strong></li>
-              <li><span>Reinforce door</span><strong>R</strong></li>
-              <li><span>Toggle movement mode</span><strong>Tab</strong></li>
-              <li><span>Admin mode</span><strong>F1</strong></li>
-              <li><span>Admin money</span><strong>Insert</strong></li>
-            </ul>
+            <h2 id="controlsHeading">조작</h2>
+            <ul class="controls" id="controlsList"></ul>
           </section>
 
           <section class="panel">
-            <h2>Event Log</h2>
+            <h2 id="logHeading">이벤트 로그</h2>
             <div class="log" id="log"></div>
           </section>
 
           <section class="panel">
-            <h2>Meta</h2>
+            <h2 id="metaHeading">기록</h2>
             <div class="stats" id="meta"></div>
           </section>
         </aside>

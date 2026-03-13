@@ -11,9 +11,139 @@ const promptEl = document.getElementById("promptText");
 const restartButton = document.getElementById("restartButton");
 const titleOverlay = document.getElementById("titleOverlay");
 const startButton = document.getElementById("startButton");
+const subtitleText = document.getElementById("subtitleText");
+const themeChip = document.getElementById("themeChip");
+const alarmStrip = document.getElementById("alarmStrip");
+const titleKicker = document.getElementById("titleKicker");
+const titleOverlayHeading = document.getElementById("titleOverlayHeading");
+const titleOverlayCopy = document.getElementById("titleOverlayCopy");
+const missionHeading = document.getElementById("missionHeading");
+const runHeading = document.getElementById("runHeading");
+const controlsHeading = document.getElementById("controlsHeading");
+const controlsList = document.getElementById("controlsList");
+const logHeading = document.getElementById("logHeading");
+const metaHeading = document.getElementById("metaHeading");
+const languageButton = document.getElementById("languageButton");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
+
+const I18N = {
+  ko: {
+    subtitle: "브라우저용 애니 호러 솔로 디펜스 런.",
+    themeChip: "셀 호러 HUD",
+    restart: "다시 시작",
+    alarm: "구역 상태 불안정. 확률이 곧 법칙이다.",
+    titleKicker: "Night Protocol",
+    titleOverlayHeading: "격리 구역 진입",
+    titleOverlayCopy:
+      "빈 방을 점거하고, 확률을 뚫어 버티고, 정전을 견디고, 복도가 네 이름을 기억하기 전에 탈출하세요.",
+    start: "작전 시작",
+    missionHeading: "임무 피드",
+    runHeading: "현재 런",
+    controlsHeading: "조작",
+    logHeading: "이벤트 로그",
+    metaHeading: "기록",
+    controls: [
+      ["이동", "PC: WASD / 모바일: 터치"],
+      ["상호작용", "E"],
+      ["문 강화", "R"],
+      ["이동 방식 전환", "Tab"],
+      ["운영자 모드", "F1"],
+      ["운영자 자금", "Insert"],
+    ],
+    stat_health: "체력",
+    stat_gold: "골드",
+    stat_time: "시간",
+    stat_movement: "이동",
+    stat_admin: "운영자",
+    stat_room: "방",
+    stat_fragments: "지도 조각",
+    stat_sigils: "시질",
+    stat_blackout: "정전",
+    meta_runs: "플레이 수",
+    meta_escapes: "탈출 수",
+    meta_bestTime: "최고 시간",
+    room_none: "없음",
+    movement_wasd: "키보드",
+    movement_click: "포인트",
+    objective_findRoom: "빈 방을 찾아 점거하고, 추격자가 문을 기억하기 전에 자리를 잡으세요.",
+    objective_fragments: "침대에서 돈을 벌고, 수호자를 뽑고, 단말기에서 지도 조각을 도박처럼 수집하세요.",
+    objective_sigils: "두 개의 시질을 회수해 서비스 게이트를 강제로 여세요.",
+    objective_escape: "복도가 널 삼키기 전에 서비스 게이트로 달리세요.",
+    prompt_none: "지금 당장 할 상호작용이 없습니다.",
+    prompt_generator: "E를 누르고 유지해 발전기를 수리하세요.",
+    prompt_escape: "E를 눌러 탈출하세요.",
+    prompt_claim: "E를 눌러 이 방을 점거하세요.",
+    prompt_summon: "E를 눌러 랜덤 수호자를 소환하세요.",
+    prompt_intel: "E를 눌러 지도 정보를 도박처럼 구매하세요.",
+    prompt_door: "E로 문 개폐, R로 문 강화.",
+    start_banner_title: "작전 시작",
+    start_banner_subtitle: "추격자가 고정되기 전에 방을 점거하세요.",
+    outcome_escape: "서비스 게이트가 닫히기 전에 간신히 빠져나왔습니다.",
+    save_unavailable: "이 브라우저 세션에서는 저장소를 사용할 수 없습니다.",
+    player_tag: "나",
+  },
+  en: {
+    subtitle: "Anime-horror solo defense run for the browser.",
+    themeChip: "Cel Horror HUD",
+    restart: "Restart Run",
+    alarm: "Ward state unstable. Probability is law.",
+    titleKicker: "Night Protocol",
+    titleOverlayHeading: "Enter The Ward",
+    titleOverlayCopy:
+      "Claim a room. Rig the odds. Survive the blackout. Escape before the corridor learns your name.",
+    start: "Start Operation",
+    missionHeading: "Mission Feed",
+    runHeading: "Run",
+    controlsHeading: "Controls",
+    logHeading: "Event Log",
+    metaHeading: "Meta",
+    controls: [
+      ["Move", "PC: WASD / Mobile: Touch"],
+      ["Interact", "E"],
+      ["Reinforce door", "R"],
+      ["Toggle movement mode", "Tab"],
+      ["Admin mode", "F1"],
+      ["Admin money", "Insert"],
+    ],
+    stat_health: "Health",
+    stat_gold: "Gold",
+    stat_time: "Time",
+    stat_movement: "Movement",
+    stat_admin: "Admin",
+    stat_room: "Room",
+    stat_fragments: "Fragments",
+    stat_sigils: "Sigils",
+    stat_blackout: "Blackout",
+    meta_runs: "Runs",
+    meta_escapes: "Escapes",
+    meta_bestTime: "Best time",
+    room_none: "None",
+    movement_wasd: "Keyboard",
+    movement_click: "Point",
+    objective_findRoom: "Find a vacant room and bind it before the ward closes around you.",
+    objective_fragments: "Hold the room, harvest gold from the bed, and gamble for fragments at the terminal.",
+    objective_sigils: "Recover both sigils and force the service gate to yield.",
+    objective_escape: "Run for the service gate before the ward swallows you.",
+    prompt_none: "No immediate interaction.",
+    prompt_generator: "Hold E to repair the generator.",
+    prompt_escape: "Press E to escape.",
+    prompt_claim: "Press E to claim this room.",
+    prompt_summon: "Press E to summon a random guardian.",
+    prompt_intel: "Press E to gamble for map intel.",
+    prompt_door: "Press E to open or close your door. Press R to reinforce.",
+    start_banner_title: "Operation Start",
+    start_banner_subtitle: "Claim a room before the hunter locks in.",
+    outcome_escape: "The service gate opened before the corridor could close its hand.",
+    save_unavailable: "Save storage unavailable in this browser session.",
+    player_tag: "YOU",
+  },
+};
+
+function t(key) {
+  return (I18N[state.lang] && I18N[state.lang][key]) || I18N.en[key] || key;
+}
 
 const CONFIG = {
   player: {
@@ -102,6 +232,7 @@ const state = {
   banner: null,
   flash: null,
   outcomeText: "",
+  lang: loadLanguage(),
 };
 
 const colors = {
@@ -373,36 +504,76 @@ function resetGame() {
   state.flash = null;
   state.outcomeText = "";
   game = createGame();
-  pushLog("Run reset. Claim a room and survive long enough to escape.");
+  pushLog(state.lang === "ko" ? "런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요." : "Run reset. Claim a room and survive long enough to escape.");
   renderHud();
 }
 
 function startRun() {
+  if (!state.titleVisible) {
+    return;
+  }
   ensureAudio();
   state.titleVisible = false;
   titleOverlay.classList.add("hidden");
-  showBanner("Operation Start", "Claim a room before the hunter locks in.", "cyan", 1.6);
+  showBanner(t("start_banner_title"), t("start_banner_subtitle"), "cyan", 1.6);
   flashScreen("rgba(133, 216, 255, 0.18)", 0.34, 0.2);
+}
+
+function toggleLanguage() {
+  state.lang = state.lang === "ko" ? "en" : "ko";
+  saveLanguage(state.lang);
+  applyStaticText();
+  renderHud();
+}
+
+function applyStaticText() {
+  document.documentElement.lang = state.lang;
+  subtitleText.textContent = t("subtitle");
+  themeChip.textContent = t("themeChip");
+  restartButton.textContent = t("restart");
+  alarmStrip.textContent = t("alarm");
+  titleKicker.textContent = t("titleKicker");
+  titleOverlayHeading.textContent = t("titleOverlayHeading");
+  titleOverlayCopy.textContent = t("titleOverlayCopy");
+  startButton.textContent = t("start");
+  missionHeading.textContent = t("missionHeading");
+  runHeading.textContent = t("runHeading");
+  controlsHeading.textContent = t("controlsHeading");
+  logHeading.textContent = t("logHeading");
+  metaHeading.textContent = t("metaHeading");
+  languageButton.textContent = state.lang === "ko" ? "EN" : "KO";
+  controlsList.innerHTML = I18N[state.lang].controls
+    .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
+    .join("");
 }
 
 restartButton.addEventListener("click", resetGame);
 startButton.addEventListener("click", startRun);
+languageButton.addEventListener("click", toggleLanguage);
 
 window.addEventListener("keydown", (event) => {
   ensureAudio();
+
+  if (state.titleVisible) {
+    const launchKeys = new Set(["enter", " ", "w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"]);
+    if (launchKeys.has(event.key.toLowerCase())) {
+      event.preventDefault();
+      startRun();
+    }
+  }
 
   if (event.key === "Tab") {
     event.preventDefault();
     state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
     state.clickTarget = null;
-    pushLog(`Movement mode: ${state.movementMode.toUpperCase()}`);
+    pushLog(state.lang === "ko" ? `이동 방식: ${t(`movement_${state.movementMode}`)}` : `Movement mode: ${state.movementMode.toUpperCase()}`);
     return;
   }
 
   if (event.key.toLowerCase() === CONFIG.admin.toggleKey) {
     event.preventDefault();
     state.adminMode = !state.adminMode;
-    pushLog(`Admin mode ${state.adminMode ? "enabled" : "disabled"}.`);
+    pushLog(state.lang === "ko" ? `운영자 모드 ${state.adminMode ? "활성화" : "비활성화"}.` : `Admin mode ${state.adminMode ? "enabled" : "disabled"}.`);
     playUiTone(state.adminMode ? 680 : 280, 0.08, "triangle", 0.035);
     return;
   }
@@ -410,10 +581,10 @@ window.addEventListener("keydown", (event) => {
   if (event.key.toLowerCase() === CONFIG.admin.payoutKey) {
     if (state.adminMode) {
       addGold(CONFIG.admin.payoutAmount);
-      pushLog(`Admin cache injected: +${CONFIG.admin.payoutAmount} gold.`);
+      pushLog(state.lang === "ko" ? `운영자 자금 투입: +${CONFIG.admin.payoutAmount} 골드.` : `Admin cache injected: +${CONFIG.admin.payoutAmount} gold.`);
       playUiTone(560, 0.1, "square", 0.04);
     } else {
-      pushLog("Admin mode is off.");
+      pushLog(state.lang === "ko" ? "운영자 모드가 꺼져 있습니다." : "Admin mode is off.");
       playUiTone(200, 0.08, "sawtooth", 0.03);
     }
     return;
@@ -436,12 +607,48 @@ window.addEventListener("keyup", (event) => {
 
 canvas.addEventListener("click", (event) => {
   ensureAudio();
+  if (state.titleVisible) {
+    startRun();
+  }
   if (state.movementMode !== "click") {
     return;
   }
   const point = canvasPoint(event);
   state.clickTarget = point;
 });
+
+canvas.addEventListener(
+  "touchstart",
+  (event) => {
+    ensureAudio();
+    if (state.titleVisible) {
+      startRun();
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    event.preventDefault();
+    state.clickTarget = canvasPoint(touch);
+  },
+  { passive: false },
+);
+
+canvas.addEventListener(
+  "touchmove",
+  (event) => {
+    if (state.titleVisible) {
+      return;
+    }
+    const touch = event.touches[0];
+    if (!touch) {
+      return;
+    }
+    event.preventDefault();
+    state.clickTarget = canvasPoint(touch);
+  },
+  { passive: false },
+);
 
 function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
@@ -709,27 +916,27 @@ function getPrompt() {
   const ownedRoom = getOwnedRoom();
 
   if (game.blackoutActive && distance(player, world.generator) < 46) {
-    return { type: "generator", text: "Hold E to repair the generator." };
+    return { type: "generator", text: t("prompt_generator") };
   }
 
   if (world.exitRoom.gate.closed === false && pointInRect(player.x, player.y, world.exitRoom)) {
-    return { type: "escape", text: "Press E to escape." };
+    return { type: "escape", text: t("prompt_escape") };
   }
 
   if (room && !room.owner && distance(player, room.bed) < 42) {
-    return { type: "claim", room, text: "Press E to claim this room." };
+    return { type: "claim", room, text: t("prompt_claim") };
   }
 
   if (ownedRoom && distance(player, ownedRoom.altar) < 42) {
-    return { type: "summon", room: ownedRoom, text: "Press E to summon a random guardian." };
+    return { type: "summon", room: ownedRoom, text: t("prompt_summon") };
   }
 
   if (ownedRoom && distance(player, ownedRoom.terminal) < 42) {
-    return { type: "intel", room: ownedRoom, text: "Press E to gamble for map intel." };
+    return { type: "intel", room: ownedRoom, text: t("prompt_intel") };
   }
 
   if (ownedRoom && distance(player, { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY }) < 42) {
-    return { type: "door", room: ownedRoom, text: "Press E to open or close your door. Press R to reinforce." };
+    return { type: "door", room: ownedRoom, text: t("prompt_door") };
   }
 
   return null;
@@ -746,7 +953,7 @@ function escapeRun() {
   state.meta.bestTime = Math.max(state.meta.bestTime, game.time);
   saveMeta(state.meta);
   pushLog("Escape successful. The ward lost you.");
-  state.outcomeText = "The service gate opened before the corridor could close its hand.";
+  state.outcomeText = t("outcome_escape");
   showBanner("Escape Complete", "You slipped beyond the service gate.", "cyan", 2.3);
   flashScreen("rgba(133, 216, 255, 0.24)", 0.55, 0.3);
 }
@@ -1774,6 +1981,19 @@ function drawCharacter(entity, kind) {
   const radius = entity.radius || (kind === "hider" ? 11 : 10);
   drawCelOrb(entity.x, entity.y, radius, palette.fill, palette.rim, palette.glow);
 
+  if (kind === "player") {
+    ctx.save();
+    ctx.strokeStyle = "rgba(133, 216, 255, 0.95)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(entity.x, entity.y, radius + 9, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#f5fbff";
+    ctx.font = "700 12px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+    ctx.fillText(t("player_tag"), entity.x - 10, entity.y - radius - 14);
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(entity.x, entity.y);
   ctx.strokeStyle = "rgba(18, 18, 28, 0.95)";
@@ -2128,15 +2348,15 @@ function drawTracerEffect(effect) {
 function renderHud() {
   const ownedRoom = getOwnedRoom();
   const stats = [
-    ["Health", `${Math.ceil(game.player.hp)} / ${game.player.maxHp}`, game.player.hp < 30 ? "danger" : ""],
-    ["Gold", `${Math.floor(game.gold)}`, "gold"],
-    ["Time", formatTime(game.time), ""],
-    ["Movement", state.movementMode.toUpperCase(), ""],
-    ["Admin", state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
-    ["Room", ownedRoom ? ownedRoom.label : "None", ""],
-    ["Fragments", `${game.fragments} / 6`, ""],
-    ["Sigils", `${game.keycardsCollected} / 2`, ""],
-    ["Blackout", game.blackoutActive ? "ACTIVE" : `${Math.ceil(game.blackoutTimer)}s`, game.blackoutActive ? "danger" : ""],
+    [t("stat_health"), `${Math.ceil(game.player.hp)} / ${game.player.maxHp}`, game.player.hp < 30 ? "danger" : ""],
+    [t("stat_gold"), `${Math.floor(game.gold)}`, "gold"],
+    [t("stat_time"), formatTime(game.time), ""],
+    [t("stat_movement"), t(`movement_${state.movementMode}`), ""],
+    [t("stat_admin"), state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
+    [t("stat_room"), ownedRoom ? ownedRoom.label : t("room_none"), ""],
+    [t("stat_fragments"), `${game.fragments} / 6`, ""],
+    [t("stat_sigils"), `${game.keycardsCollected} / 2`, ""],
+    [t("stat_blackout"), game.blackoutActive ? "ACTIVE" : `${Math.ceil(game.blackoutTimer)}s`, game.blackoutActive ? "danger" : ""],
   ];
 
   statsEl.innerHTML = stats
@@ -2147,9 +2367,9 @@ function renderHud() {
     .join("");
 
   const metaRows = [
-    ["Runs", String(state.meta.runs)],
-    ["Escapes", String(state.meta.escapes)],
-    ["Best time", formatTime(state.meta.bestTime)],
+    [t("meta_runs"), String(state.meta.runs)],
+    [t("meta_escapes"), String(state.meta.escapes)],
+    [t("meta_bestTime"), formatTime(state.meta.bestTime)],
   ];
 
   metaEl.innerHTML = metaRows
@@ -2157,17 +2377,17 @@ function renderHud() {
     .join("");
 
   const ownedObjective = !ownedRoom
-    ? "Find a vacant room and bind it before the ward closes around you."
+    ? t("objective_findRoom")
     : game.fragments < 6
-      ? "Hold the room, harvest gold from the bed, and gamble for fragments at the terminal."
+      ? t("objective_fragments")
       : game.keycardsCollected < 2
-        ? "Recover both sigils and force the service gate to yield."
-        : "Run for the service gate before the ward swallows you.";
+        ? t("objective_sigils")
+        : t("objective_escape");
 
   objectiveEl.textContent = ownedObjective;
 
   const prompt = getPrompt();
-  promptEl.textContent = prompt ? prompt.text : "No immediate interaction.";
+  promptEl.textContent = prompt ? prompt.text : t("prompt_none");
 
   logEl.innerHTML = state.logs
     .slice(-8)
@@ -2232,11 +2452,27 @@ function loadMeta() {
   }
 }
 
+function loadLanguage() {
+  try {
+    const value = localStorage.getItem("night-shift-escape-lang");
+    if (value === "ko" || value === "en") {
+      return value;
+    }
+  } catch {}
+  return "ko";
+}
+
+function saveLanguage(lang) {
+  try {
+    localStorage.setItem("night-shift-escape-lang", lang);
+  } catch {}
+}
+
 function saveMeta(meta) {
   try {
     localStorage.setItem("night-shift-escape-meta", JSON.stringify(meta));
   } catch {
-    pushLog("Save storage unavailable in this browser session.");
+    pushLog(t("save_unavailable"));
   }
 }
 
@@ -2301,5 +2537,10 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-pushLog("Find a vacant room, then build enough luck to escape.");
+if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) {
+  state.movementMode = "click";
+}
+
+applyStaticText();
+pushLog(state.lang === "ko" ? "빈 방을 점거하고, 운을 뚫으며 탈출하세요." : "Find a vacant room, then build enough luck to escape.");
 requestAnimationFrame(loop);
