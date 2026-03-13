@@ -522,6 +522,10 @@ const state = {
     dx: 0,
     dy: 0,
   },
+  camera: {
+    x: 0,
+    y: 0,
+  },
 };
 
 const colors = {
@@ -676,52 +680,58 @@ function rollBlackoutTimer(profile = game.runProfile) {
 }
 
 const world = buildWorld();
+const worldBounds = getWorldBounds(world);
 let game = createGame();
 const navGraph = buildNavGraph(world);
+updateCamera();
 
 function buildWorld() {
-  const hall = { id: "hall", x: 150, y: 250, w: 900, h: 240, label: "Central Hall" };
-  const exitConnector = { id: "exitConnector", x: 1050, y: 320, w: 130, h: 100, label: "Exit Corridor" };
-  const generatorConnector = { id: "generatorConnector", x: 980, y: 490, w: 120, h: 110, label: "Service Drop" };
+  const hall = { id: "hall", x: 240, y: 350, w: 1600, h: 320, label: "Grand Hall" };
+  const exitConnector = { id: "exitConnector", x: 1840, y: 455, w: 170, h: 110, label: "Service Corridor" };
+  const generatorConnector = { id: "generatorConnector", x: 1640, y: 670, w: 170, h: 130, label: "Power Drop" };
   const rooms = [
-    createRoom("northWest", "North Ward", 60, 60, 280, 190, 240, 250),
-    createRoom("northCenter", "Observation", 360, 60, 280, 190, 500, 250),
-    createRoom("northEast", "Old Infirmary", 660, 60, 280, 190, 800, 250),
-    createRoom("southWest", "Storage Wing", 60, 490, 280, 190, 240, 490),
-    createRoom("southCenter", "Dormitory", 360, 490, 280, 190, 500, 490),
-    createRoom("southEast", "Isolation", 660, 490, 280, 190, 800, 490),
+    createRoom("northFarWest", "North Archive", 190, 130, 280, 220, 330, 350),
+    createRoom("northWest", "North Ward", 480, 130, 280, 220, 620, 350),
+    createRoom("northCenter", "Observation", 770, 130, 280, 220, 910, 350),
+    createRoom("northEast", "Old Infirmary", 1060, 130, 280, 220, 1200, 350),
+    createRoom("northFarEast", "Prayer Ward", 1350, 130, 280, 220, 1490, 350),
+    createRoom("southFarWest", "Evidence Vault", 190, 670, 280, 220, 330, 670),
+    createRoom("southWest", "Storage Wing", 480, 670, 280, 220, 620, 670),
+    createRoom("southCenter", "Dormitory", 770, 670, 280, 220, 910, 670),
+    createRoom("southEast", "Isolation", 1060, 670, 280, 220, 1200, 670),
+    createRoom("southFarEast", "Mortuary Annex", 1350, 670, 280, 220, 1490, 670),
   ];
   const generatorRoom = {
     id: "generator",
-    x: 920,
-    y: 600,
-    w: 300,
-    h: 120,
+    x: 1540,
+    y: 800,
+    w: 420,
+    h: 180,
     label: "Generator Room",
     door: {
-      x: 1050,
-      y: 600,
+      x: 1700,
+      y: 800,
       w: 40,
       h: 10,
-      centerX: 1070,
-      centerY: 600,
+      centerX: 1720,
+      centerY: 800,
       closed: false,
     },
   };
   const exitRoom = {
     id: "exit",
-    x: 1180,
-    y: 300,
-    w: 140,
-    h: 140,
+    x: 2010,
+    y: 420,
+    w: 220,
+    h: 180,
     label: "Service Gate",
     gate: {
-      x: 1180,
-      y: 350,
+      x: 2010,
+      y: 490,
       w: 10,
       h: 40,
-      centerX: 1185,
-      centerY: 370,
+      centerX: 2015,
+      centerY: 510,
       closed: true,
     },
   };
@@ -730,7 +740,7 @@ function buildWorld() {
   const barriers = [];
 
   for (const room of rooms) {
-    const sharedY = room.y + room.h === hall.y ? hall.y : room.y;
+    const sharedY = room.y < hall.y ? hall.y : room.y;
     barriers.push(
       { x: room.x, y: sharedY - 4, w: room.door.x - room.x, h: 8 },
       {
@@ -768,11 +778,41 @@ function buildWorld() {
     exitRoom,
     zones,
     barriers,
-    generator: { x: 1070, y: 658, radius: 28 },
+    generator: { x: 1720, y: 885, radius: 28 },
     keycards: [
-      { id: "sigilWest", x: 1070, y: 690, roomId: "generator", threshold: 2, collected: false, visible: false },
-      { id: "sigilEast", x: 880, y: 585, roomId: "southEast", threshold: 4, collected: false, visible: false },
+      { id: "sigilWest", x: 1720, y: 930, roomId: "generator", threshold: 2, collected: false, visible: false },
+      { id: "sigilEast", x: 1510, y: 760, roomId: "southFarEast", threshold: 4, collected: false, visible: false },
     ],
+  };
+}
+
+function getWorldBounds(currentWorld) {
+  const xs = currentWorld.zones.map((zone) => zone.x);
+  const ys = currentWorld.zones.map((zone) => zone.y);
+  const maxXs = currentWorld.zones.map((zone) => zone.x + zone.w);
+  const maxYs = currentWorld.zones.map((zone) => zone.y + zone.h);
+  return {
+    minX: Math.min(...xs) - 80,
+    minY: Math.min(...ys) - 80,
+    maxX: Math.max(...maxXs) + 80,
+    maxY: Math.max(...maxYs) + 80,
+    w: Math.max(...maxXs) - Math.min(...xs) + 160,
+    h: Math.max(...maxYs) - Math.min(...ys) + 160,
+  };
+}
+
+function updateCamera() {
+  if (!game || !game.player) {
+    return;
+  }
+  state.camera.x = clamp(game.player.x - WIDTH / 2, worldBounds.minX, worldBounds.maxX - WIDTH);
+  state.camera.y = clamp(game.player.y - HEIGHT / 2, worldBounds.minY, worldBounds.maxY - HEIGHT);
+}
+
+function worldToScreen(point) {
+  return {
+    x: point.x - state.camera.x,
+    y: point.y - state.camera.y,
   };
 }
 
@@ -843,8 +883,8 @@ function createGame() {
   world.exitRoom.gate.closed = true;
 
   const player = {
-    x: 590,
-    y: 370,
+    x: 1040,
+    y: 520,
     radius: 12,
     hp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
     maxHp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
@@ -857,13 +897,13 @@ function createGame() {
   };
 
   const hunter = {
-    x: 590,
-    y: 310,
+    x: 1040,
+    y: 430,
     radius: 16,
     hp: (CONFIG.hunter.baseHp + CONFIG.hunter.hpPerLevel) * runProfile.modifiers.hunterHpMultiplier,
     targetRoomId: null,
-    targetX: 590,
-    targetY: 370,
+    targetX: 1040,
+    targetY: 520,
     speed: 72,
     attackCooldown: 0,
     retargetTimer: 0,
@@ -877,9 +917,11 @@ function createGame() {
   };
 
   const assigned = new Map([
-    ["northWest", "hiderA"],
-    ["northEast", "hiderB"],
-    ["southEast", "hiderC"],
+    ["northFarWest", "hiderA"],
+    ["northWest", "hiderB"],
+    ["northEast", "hiderC"],
+    ["southWest", "hiderD"],
+    ["southFarEast", "hiderE"],
   ]);
 
   const hiders = [];
@@ -948,6 +990,7 @@ function resetGame() {
   state.flash = null;
   state.outcomeText = "";
   game = createGame();
+  updateCamera();
   pushLog(langText("런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요.", "Run reset. Claim a room and survive long enough to escape."));
   announceRunSetup();
   renderHud();
@@ -1270,8 +1313,8 @@ window.addEventListener("pointercancel", handleStickPointerUp);
 
 function canvasPoint(event) {
   const rect = canvas.getBoundingClientRect();
-  const x = ((event.clientX - rect.left) / rect.width) * WIDTH;
-  const y = ((event.clientY - rect.top) / rect.height) * HEIGHT;
+  const x = ((event.clientX - rect.left) / rect.width) * WIDTH + state.camera.x;
+  const y = ((event.clientY - rect.top) / rect.height) * HEIGHT + state.camera.y;
   return { x, y };
 }
 
@@ -1715,6 +1758,7 @@ function update(dt) {
   updateBanner(dt);
   updateFlash(dt);
   updatePlayer(dt);
+  updateCamera();
   updateEconomy(dt);
   updateBlackout(dt);
   updateMutation(dt);
@@ -1987,8 +2031,8 @@ function updateUnits(dt) {
   game.infected = game.infected.filter((enemy) => enemy.hp > 0);
   if (game.hunter.hp <= 0) {
     game.hunter.hp = hunterMaxHp();
-    game.hunter.x = 590;
-    game.hunter.y = 310;
+    game.hunter.x = world.hall.x + world.hall.w / 2;
+    game.hunter.y = world.hall.y + 80;
     pushLog(langText("술래가 홀에서 다시 형체를 만들었습니다.", "The hunter reformed in the hall."));
     pulseShake(1.8);
     playUiTone(110, 0.28, "triangle", 0.035);
@@ -2533,28 +2577,38 @@ function buildNavGraph(currentWorld) {
     }
   };
 
-  pushNode("hallLeft", currentWorld.hall.x + 150, currentWorld.hall.y + currentWorld.hall.h / 2);
-  pushNode("hallCenter", currentWorld.hall.x + currentWorld.hall.w / 2, currentWorld.hall.y + currentWorld.hall.h / 2);
-  pushNode("hallRight", currentWorld.hall.x + currentWorld.hall.w - 120, currentWorld.hall.y + currentWorld.hall.h / 2);
+  const hallHubs = [];
+  for (let index = 0; index < 5; index += 1) {
+    const id = `hallHub${index}`;
+    const x = currentWorld.hall.x + 180 + index * ((currentWorld.hall.w - 360) / 4);
+    const y = currentWorld.hall.y + currentWorld.hall.h / 2;
+    hallHubs.push({ id, x, y });
+    pushNode(id, x, y);
+    if (index > 0) {
+      link(`hallHub${index - 1}`, id);
+    }
+  }
   pushNode("exitConnector", currentWorld.exitConnector.x + currentWorld.exitConnector.w / 2, currentWorld.exitConnector.y + currentWorld.exitConnector.h / 2);
   pushNode("generatorConnector", currentWorld.generatorConnector.x + currentWorld.generatorConnector.w / 2, currentWorld.generatorConnector.y + currentWorld.generatorConnector.h / 2);
 
-  link("hallLeft", "hallCenter");
-  link("hallCenter", "hallRight");
-  link("hallRight", "exitConnector");
-  link("hallRight", "generatorConnector");
+  link("hallHub4", "exitConnector");
+  link("hallHub4", "generatorConnector");
 
   for (const room of currentWorld.rooms) {
     const doorId = `${room.id}Door`;
     const roomId = `${room.id}Room`;
     pushNode(doorId, room.door.centerX, room.door.centerY + (room.y < currentWorld.hall.y ? 28 : -28));
     pushNode(roomId, room.x + room.w / 2, room.y + room.h / 2);
-    const hub = room.door.centerX < currentWorld.hall.x + currentWorld.hall.w / 3
-      ? "hallLeft"
-      : room.door.centerX < currentWorld.hall.x + (currentWorld.hall.w * 2) / 3
-        ? "hallCenter"
-        : "hallRight";
-    link(hub, doorId);
+    let closestHub = hallHubs[0].id;
+    let bestDistance = Infinity;
+    for (const hub of hallHubs) {
+      const d = Math.abs(room.door.centerX - hub.x);
+      if (d < bestDistance) {
+        bestDistance = d;
+        closestHub = hub.id;
+      }
+    }
+    link(closestHub, doorId);
     link(doorId, roomId);
   }
 
@@ -2658,14 +2712,17 @@ function draw() {
   const shakeY = (Math.random() - 0.5) * state.screenShake * 10;
   ctx.translate(shakeX, shakeY);
   drawAtmosphere();
+  ctx.save();
+  ctx.translate(-state.camera.x, -state.camera.y);
   drawZones();
-  drawThreatOverlay();
   drawKeycards();
   drawAfterimages();
   drawUnits();
   drawActors();
   drawDoors();
   drawEffects();
+  ctx.restore();
+  drawThreatOverlay();
   drawHudMap();
   drawLighting();
   ctx.restore();
@@ -2868,39 +2925,42 @@ function drawLighting() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.globalCompositeOperation = "destination-out";
 
+  const screenPlayer = worldToScreen(game.player);
   const playerLightRadius = 168 + Math.sin(game.time * 5.4) * 6;
-  const playerLight = ctx.createRadialGradient(game.player.x, game.player.y, 24, game.player.x, game.player.y, playerLightRadius);
+  const playerLight = ctx.createRadialGradient(screenPlayer.x, screenPlayer.y, 24, screenPlayer.x, screenPlayer.y, playerLightRadius);
   playerLight.addColorStop(0, "rgba(0, 0, 0, 0.92)");
   playerLight.addColorStop(1, "rgba(0, 0, 0, 0)");
   ctx.fillStyle = playerLight;
   ctx.beginPath();
-  ctx.arc(game.player.x, game.player.y, playerLightRadius, 0, Math.PI * 2);
+  ctx.arc(screenPlayer.x, screenPlayer.y, playerLightRadius, 0, Math.PI * 2);
   ctx.fill();
 
   if (!game.blackoutActive) {
     const ownedRoom = getOwnedRoom();
     if (ownedRoom) {
+      const roomCenter = worldToScreen({ x: ownedRoom.x + ownedRoom.w / 2, y: ownedRoom.y + ownedRoom.h / 2 });
       const roomLight = ctx.createRadialGradient(
-        ownedRoom.x + ownedRoom.w / 2,
-        ownedRoom.y + ownedRoom.h / 2,
+        roomCenter.x,
+        roomCenter.y,
         50,
-        ownedRoom.x + ownedRoom.w / 2,
-        ownedRoom.y + ownedRoom.h / 2,
+        roomCenter.x,
+        roomCenter.y,
         150 + Math.sin(game.time * 2.5) * 5,
       );
       roomLight.addColorStop(0, "rgba(0, 0, 0, 0.4)");
       roomLight.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = roomLight;
       ctx.beginPath();
-      ctx.arc(ownedRoom.x + ownedRoom.w / 2, ownedRoom.y + ownedRoom.h / 2, 150, 0, Math.PI * 2);
+      ctx.arc(roomCenter.x, roomCenter.y, 150, 0, Math.PI * 2);
       ctx.fill();
     }
   }
 
   if (game.radarTime > 0) {
     for (const enemy of [game.hunter, ...game.infected]) {
+      const screenEnemy = worldToScreen(enemy);
       ctx.beginPath();
-      ctx.arc(enemy.x, enemy.y, 40, 0, Math.PI * 2);
+      ctx.arc(screenEnemy.x, screenEnemy.y, 40, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
       ctx.fill();
     }
@@ -2928,7 +2988,7 @@ function drawHudMap() {
   ctx.font = "700 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
   ctx.fillText(langText("지도 조각", "Map Fragments"), panel.x + 16, panel.y + 24);
 
-  const mapScale = 0.2;
+  const mapScale = Math.min((panel.w - 28) / worldBounds.w, (panel.h - 46) / worldBounds.h);
   const ox = panel.x + 12;
   const oy = panel.y + 34;
   const revealTier = game.fragments >= 6 ? 3 : game.fragments >= 4 ? 2 : game.fragments >= 2 ? 1 : 0;
@@ -2948,19 +3008,36 @@ function drawHudMap() {
 
   for (const zone of shownZones) {
     ctx.fillStyle = "rgba(112, 139, 133, 0.6)";
-    ctx.fillRect(ox + zone.x * mapScale, oy + zone.y * mapScale, zone.w * mapScale, zone.h * mapScale);
+    ctx.fillRect(
+      ox + (zone.x - worldBounds.minX) * mapScale,
+      oy + (zone.y - worldBounds.minY) * mapScale,
+      zone.w * mapScale,
+      zone.h * mapScale,
+    );
   }
 
   ctx.fillStyle = "#dbece1";
   ctx.beginPath();
-  ctx.arc(ox + game.player.x * mapScale, oy + game.player.y * mapScale, 4, 0, Math.PI * 2);
+  ctx.arc(
+    ox + (game.player.x - worldBounds.minX) * mapScale,
+    oy + (game.player.y - worldBounds.minY) * mapScale,
+    4,
+    0,
+    Math.PI * 2,
+  );
   ctx.fill();
 
   if (game.radarTime > 0) {
     ctx.fillStyle = "#ff7e7e";
     for (const enemy of [game.hunter, ...game.infected]) {
       ctx.beginPath();
-      ctx.arc(ox + enemy.x * mapScale, oy + enemy.y * mapScale, 3, 0, Math.PI * 2);
+      ctx.arc(
+        ox + (enemy.x - worldBounds.minX) * mapScale,
+        oy + (enemy.y - worldBounds.minY) * mapScale,
+        3,
+        0,
+        Math.PI * 2,
+      );
       ctx.fill();
     }
   }
