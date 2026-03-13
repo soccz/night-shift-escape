@@ -686,23 +686,31 @@ const navGraph = buildNavGraph(world);
 updateCamera();
 
 function buildWorld() {
-  const hall = { id: "hall", x: 240, y: 350, w: 1600, h: 320, label: "Grand Hall" };
-  const exitConnector = { id: "exitConnector", x: 1840, y: 455, w: 170, h: 110, label: "Service Corridor" };
-  const generatorConnector = { id: "generatorConnector", x: 1640, y: 670, w: 170, h: 130, label: "Power Drop" };
+  const hall = { id: "hall", floor: "f1", x: 240, y: 350, w: 1600, h: 320, label: "Grand Hall" };
+  const exitConnector = { id: "exitConnector", floor: "f1", x: 1840, y: 455, w: 170, h: 110, label: "Service Corridor" };
+  const generatorConnector = { id: "generatorConnector", floor: "f1", x: 1640, y: 670, w: 170, h: 130, label: "Power Drop" };
   const rooms = [
-    createRoom("northFarWest", "North Archive", 190, 130, 280, 220, 330, 350),
-    createRoom("northWest", "North Ward", 480, 130, 280, 220, 620, 350),
-    createRoom("northCenter", "Observation", 770, 130, 280, 220, 910, 350),
-    createRoom("northEast", "Old Infirmary", 1060, 130, 280, 220, 1200, 350),
-    createRoom("northFarEast", "Prayer Ward", 1350, 130, 280, 220, 1490, 350),
-    createRoom("southFarWest", "Evidence Vault", 190, 670, 280, 220, 330, 670),
-    createRoom("southWest", "Storage Wing", 480, 670, 280, 220, 620, 670),
-    createRoom("southCenter", "Dormitory", 770, 670, 280, 220, 910, 670),
-    createRoom("southEast", "Isolation", 1060, 670, 280, 220, 1200, 670),
-    createRoom("southFarEast", "Mortuary Annex", 1350, 670, 280, 220, 1490, 670),
+    createRoom("northFarWest", "North Archive", 190, 130, 280, 220, 330, 350, "f1"),
+    createRoom("northWest", "North Ward", 480, 130, 280, 220, 620, 350, "f1"),
+    createRoom("northCenter", "Observation", 770, 130, 280, 220, 910, 350, "f1"),
+    createRoom("northEast", "Old Infirmary", 1060, 130, 280, 220, 1200, 350, "f1"),
+    createRoom("northFarEast", "Prayer Ward", 1350, 130, 280, 220, 1490, 350, "f1"),
+    createRoom("southFarWest", "Evidence Vault", 190, 670, 280, 220, 330, 670, "f1"),
+    createRoom("southWest", "Storage Wing", 480, 670, 280, 220, 620, 670, "f1"),
+    createRoom("southCenter", "Dormitory", 770, 670, 280, 220, 910, 670, "f1"),
+    createRoom("southEast", "Isolation", 1060, 670, 280, 220, 1200, 670, "f1"),
+    createRoom("southFarEast", "Mortuary Annex", 1350, 670, 280, 220, 1490, 670, "f1"),
+  ];
+  const upperHall = { id: "upperHall", floor: "f2", x: 320, y: 350, w: 1140, h: 300, label: "Archive Upper Hall" };
+  const upperRooms = [
+    createRoom("upperNorthWest", "Archive Cells", 340, 120, 260, 210, 470, 350, "f2"),
+    createRoom("upperNorthEast", "Survey Deck", 680, 120, 260, 210, 810, 350, "f2"),
+    createRoom("upperSouthWest", "Specimen Lab", 520, 670, 280, 210, 660, 670, "f2"),
+    createRoom("upperSouthEast", "Signal Room", 980, 670, 280, 210, 1120, 670, "f2"),
   ];
   const generatorRoom = {
     id: "generator",
+    floor: "f1",
     x: 1540,
     y: 800,
     w: 420,
@@ -720,6 +728,7 @@ function buildWorld() {
   };
   const exitRoom = {
     id: "exit",
+    floor: "f1",
     x: 2010,
     y: 420,
     w: 220,
@@ -736,14 +745,15 @@ function buildWorld() {
     },
   };
 
-  const zones = [hall, exitConnector, generatorConnector, generatorRoom, exitRoom, ...rooms];
+  const zones = [hall, exitConnector, generatorConnector, generatorRoom, exitRoom, upperHall, ...rooms, ...upperRooms];
   const barriers = [];
 
-  for (const room of rooms) {
+  for (const room of [...rooms, ...upperRooms]) {
     const sharedY = room.y < hall.y ? hall.y : room.y;
     barriers.push(
-      { x: room.x, y: sharedY - 4, w: room.door.x - room.x, h: 8 },
+      { floor: room.floor, x: room.x, y: sharedY - 4, w: room.door.x - room.x, h: 8 },
       {
+        floor: room.floor,
         x: room.door.x + room.door.w,
         y: sharedY - 4,
         w: room.x + room.w - (room.door.x + room.door.w),
@@ -753,15 +763,17 @@ function buildWorld() {
   }
 
   barriers.push(
-    { x: generatorRoom.x, y: generatorRoom.y - 4, w: generatorRoom.door.x - generatorRoom.x, h: 8 },
+    { floor: "f1", x: generatorRoom.x, y: generatorRoom.y - 4, w: generatorRoom.door.x - generatorRoom.x, h: 8 },
     {
+      floor: "f1",
       x: generatorRoom.door.x + generatorRoom.door.w,
       y: generatorRoom.y - 4,
       w: generatorRoom.x + generatorRoom.w - (generatorRoom.door.x + generatorRoom.door.w),
       h: 8,
     },
-    { x: exitRoom.x - 4, y: exitRoom.y, w: 8, h: exitRoom.gate.y - exitRoom.y },
+    { floor: "f1", x: exitRoom.x - 4, y: exitRoom.y, w: 8, h: exitRoom.gate.y - exitRoom.y },
     {
+      floor: "f1",
       x: exitRoom.x - 4,
       y: exitRoom.gate.y + exitRoom.gate.h,
       w: 8,
@@ -771,17 +783,42 @@ function buildWorld() {
 
   return {
     hall,
+    upperHall,
     exitConnector,
     generatorConnector,
-    rooms,
+    rooms: [...rooms, ...upperRooms],
     generatorRoom,
     exitRoom,
     zones,
     barriers,
     generator: { x: 1720, y: 885, radius: 28 },
+    elevators: [
+      {
+        id: "liftF1",
+        floor: "f1",
+        x: 1590,
+        y: 510,
+        radius: 24,
+        label: "Archive Lift",
+        destinationFloor: "f2",
+        destinationX: 420,
+        destinationY: 510,
+      },
+      {
+        id: "liftF2",
+        floor: "f2",
+        x: 420,
+        y: 510,
+        radius: 24,
+        label: "Archive Lift",
+        destinationFloor: "f1",
+        destinationX: 1590,
+        destinationY: 510,
+      },
+    ],
     keycards: [
-      { id: "sigilWest", x: 1720, y: 930, roomId: "generator", threshold: 2, collected: false, visible: false },
-      { id: "sigilEast", x: 1510, y: 760, roomId: "southFarEast", threshold: 4, collected: false, visible: false },
+      { id: "sigilWest", floor: "f1", x: 1720, y: 930, roomId: "generator", threshold: 2, collected: false, visible: false },
+      { id: "sigilEast", floor: "f2", x: 1110, y: 780, roomId: "upperSouthEast", threshold: 4, collected: false, visible: false },
     ],
   };
 }
@@ -816,12 +853,13 @@ function worldToScreen(point) {
   };
 }
 
-function createRoom(id, label, x, y, w, h, doorCenterX, doorY) {
+function createRoom(id, label, x, y, w, h, doorCenterX, doorY, floor = "f1") {
   const doorHeight = 10;
   const doorWidth = 40;
   const bed = { x: x + w * 0.28, y: y + h * 0.42, radius: 26 };
   return {
     id,
+    floor,
     label,
     x,
     y,
@@ -885,6 +923,7 @@ function createGame() {
   const player = {
     x: 1040,
     y: 520,
+    floor: "f1",
     radius: 12,
     hp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
     maxHp: CONFIG.player.maxHp + runProfile.modifiers.playerMaxHpBonus,
@@ -899,6 +938,7 @@ function createGame() {
   const hunter = {
     x: 1040,
     y: 430,
+    floor: "f1",
     radius: 16,
     hp: (CONFIG.hunter.baseHp + CONFIG.hunter.hpPerLevel) * runProfile.modifiers.hunterHpMultiplier,
     targetRoomId: null,
@@ -922,6 +962,7 @@ function createGame() {
     ["northEast", "hiderC"],
     ["southWest", "hiderD"],
     ["southFarEast", "hiderE"],
+    ["upperNorthEast", "hiderF"],
   ]);
 
   const hiders = [];
@@ -934,6 +975,7 @@ function createGame() {
       hiders.push({
         id: owner,
         roomId: room.id,
+        floor: room.floor,
         x: room.bed.x,
         y: room.bed.y,
         radius: 11,
@@ -1350,6 +1392,9 @@ function triggerInteract() {
     case "escape":
       escapeRun();
       break;
+    case "elevator":
+      useElevator(prompt.elevator);
+      break;
     default:
       break;
   }
@@ -1361,7 +1406,7 @@ function attemptReinforce() {
   }
 
   const ownedRoom = getOwnedRoom();
-  if (!ownedRoom) {
+  if (!ownedRoom || ownedRoom.floor !== game.player.floor) {
     return;
   }
 
@@ -1563,6 +1608,7 @@ function createUnitRecord(room, ownerId, type, spawnPoint) {
   return {
     id: `unit-${state.nextUnitId++}`,
     ownerId,
+    floor: room.floor,
     type,
     role: type === "sentinel" ? "anchor" : type === "rover" ? "interceptor" : type === "relic" ? "ward" : "volatile",
     roomId: room.id,
@@ -1648,43 +1694,87 @@ function getRoomByOwner(ownerId) {
 }
 
 function getRoomAt(x, y) {
-  return world.rooms.find((room) => pointInRect(x, y, room)) || null;
+  return world.rooms.find((room) => room.floor === game.player.floor && pointInRect(x, y, room)) || null;
 }
 
 function getZoneAt(x, y) {
-  return world.zones.find((zone) => pointInRect(x, y, zone)) || null;
+  return world.zones.find((zone) => zone.floor === game.player.floor && pointInRect(x, y, zone)) || null;
+}
+
+function getElevatorAt(x, y, floor = game.player.floor) {
+  return world.elevators.find((elevator) => elevator.floor === floor && distance({ x, y }, elevator) < elevator.radius + 18) || null;
 }
 
 function getPrompt() {
   const player = game.player;
   const room = getRoomAt(player.x, player.y);
   const ownedRoom = getOwnedRoom();
+  const localOwnedRoom = ownedRoom && ownedRoom.floor === player.floor ? ownedRoom : null;
 
-  if (game.blackoutActive && distance(player, world.generator) < 46) {
+  if (game.blackoutActive && world.generatorRoom.floor === player.floor && distance(player, world.generator) < 46) {
     return { type: "generator", text: t("prompt_generator") };
   }
 
-  if (world.exitRoom.gate.closed === false && pointInRect(player.x, player.y, world.exitRoom)) {
+  if (world.exitRoom.floor === player.floor && world.exitRoom.gate.closed === false && pointInRect(player.x, player.y, world.exitRoom)) {
     return { type: "escape", text: t("prompt_escape") };
+  }
+
+  const elevator = getElevatorAt(player.x, player.y);
+  if (elevator) {
+    return {
+      type: "elevator",
+      elevator,
+      text: langText(
+        `E를 눌러 ${elevator.destinationFloor === "f2" ? "2층" : "1층"}으로 이동하세요.`,
+        `Press E to travel to ${elevator.destinationFloor === "f2" ? "Floor 2" : "Floor 1"}.`,
+      ),
+    };
   }
 
   if (room && !room.owner && distance(player, room.bed) < 42) {
     return { type: "claim", room, text: t("prompt_claim") };
   }
 
-  if (ownedRoom && distance(player, ownedRoom.altar) < 42) {
-    return { type: "summon", room: ownedRoom, text: t("prompt_summon") };
+  if (localOwnedRoom && distance(player, localOwnedRoom.altar) < 42) {
+    return { type: "summon", room: localOwnedRoom, text: t("prompt_summon") };
   }
 
-  if (ownedRoom && distance(player, ownedRoom.terminal) < 42) {
-    return { type: "intel", room: ownedRoom, text: t("prompt_intel") };
+  if (localOwnedRoom && distance(player, localOwnedRoom.terminal) < 42) {
+    return { type: "intel", room: localOwnedRoom, text: t("prompt_intel") };
   }
 
-  if (ownedRoom && distance(player, { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY }) < 42) {
-    return { type: "door", room: ownedRoom, text: t("prompt_door") };
+  if (localOwnedRoom && distance(player, { x: localOwnedRoom.door.centerX, y: localOwnedRoom.door.centerY }) < 42) {
+    return { type: "door", room: localOwnedRoom, text: t("prompt_door") };
   }
 
   return null;
+}
+
+function useElevator(elevator) {
+  game.player.floor = elevator.destinationFloor;
+  game.player.x = elevator.destinationX;
+  game.player.y = elevator.destinationY;
+  state.clickTarget = null;
+  resetTouchStick();
+  game.hunter.floor = elevator.destinationFloor;
+  const floorAnchor = floorSpawnPoint(elevator.destinationFloor);
+  game.hunter.x = floorAnchor.x;
+  game.hunter.y = floorAnchor.y;
+  game.hunter.targetRoomId = null;
+  game.hunter.retargetTimer = 0;
+  updateCamera();
+  pushLog(
+    langText(
+      `${elevator.destinationFloor === "f2" ? "2층" : "1층"}으로 이동했습니다.`,
+      `Transferred to ${elevator.destinationFloor === "f2" ? "Floor 2" : "Floor 1"}.`,
+    ),
+  );
+  showBanner(
+    langText(elevator.destinationFloor === "f2" ? "2층 진입" : "1층 복귀", elevator.destinationFloor === "f2" ? "Floor 2" : "Floor 1"),
+    elevator.label,
+    "cyan",
+    1.1,
+  );
 }
 
 function escapeRun() {
@@ -1830,7 +1920,7 @@ function updatePlayer(dt) {
 
 function updateEconomy(dt) {
   const ownedRoom = getOwnedRoom();
-  if (!ownedRoom) {
+  if (!ownedRoom || ownedRoom.floor !== game.player.floor) {
     return;
   }
 
@@ -1853,8 +1943,8 @@ function updateHiders(dt) {
 
     const localThreats = [game.hunter, ...game.infected].filter(
       (enemy) =>
-        pointInRect(enemy.x, enemy.y, room) ||
-        distance(enemy, { x: room.door.centerX, y: room.door.centerY }) < 120,
+        enemy.floor === room.floor &&
+        (pointInRect(enemy.x, enemy.y, room) || distance(enemy, { x: room.door.centerX, y: room.door.centerY }) < 120),
     ).length;
 
     const safeIncome =
@@ -1919,7 +2009,7 @@ function updateBlackout(dt) {
   if (game.blackoutActive) {
     game.blackoutDuration += dt;
     if (game.blackoutDuration > CONFIG.blackout.spawnAtSeconds) {
-      spawnInfectedAt(world.generator.x, world.generator.y + 20, 2 + game.runProfile.modifiers.blackoutSpawnBonus);
+      spawnInfectedAt(world.generator.x, world.generator.y + 20, 2 + game.runProfile.modifiers.blackoutSpawnBonus, "f1");
       game.blackoutDuration = -999;
       pushLog(langText("어둠이 벽 속의 것들을 더 끌어냈습니다.", "The dark dragged more things out of the walls."));
       pulseShake(1.2);
@@ -1963,7 +2053,7 @@ function updateMutation(dt) {
   if (ownedRoom.breach) {
     ownedRoom.breachTimer -= dt;
     if (ownedRoom.breachTimer <= 0) {
-      spawnInfectedAt(ownedRoom.x + ownedRoom.w - 38, ownedRoom.y + ownedRoom.h / 2, 1);
+      spawnInfectedAt(ownedRoom.x + ownedRoom.w - 38, ownedRoom.y + ownedRoom.h / 2, 1, ownedRoom.floor);
       ownedRoom.breachTimer = randomRange(14, 22) * game.runProfile.modifiers.breachIntervalMultiplier;
       pushLog(langText("균열이 또 다른 감염체를 방 안에 토해냈습니다.", "A breach spat another infected into your room."));
       pulseShake(1.1);
@@ -1981,7 +2071,7 @@ function updateUnits(dt) {
       unit.life -= dt;
       const target = nearestEnemy(unit, 80);
       if (unit.life <= 0 || target) {
-        explodeAt(unit.x, unit.y, 56, 32);
+        explodeAt(unit.x, unit.y, 56, 32, unit.floor);
         game.units.splice(i, 1);
         pulseShake(0.9);
         playUiTone(180, 0.09, "sawtooth", 0.04);
@@ -2031,8 +2121,9 @@ function updateUnits(dt) {
   game.infected = game.infected.filter((enemy) => enemy.hp > 0);
   if (game.hunter.hp <= 0) {
     game.hunter.hp = hunterMaxHp();
-    game.hunter.x = world.hall.x + world.hall.w / 2;
-    game.hunter.y = world.hall.y + 80;
+    const respawnPoint = floorSpawnPoint(game.hunter.floor);
+    game.hunter.x = respawnPoint.x;
+    game.hunter.y = respawnPoint.y;
     pushLog(langText("술래가 홀에서 다시 형체를 만들었습니다.", "The hunter reformed in the hall."));
     pulseShake(1.8);
     playUiTone(110, 0.28, "triangle", 0.035);
@@ -2072,15 +2163,20 @@ function updateHunter(dt) {
 
 function castHunterSkill() {
   const ownedRoom = getOwnedRoom();
+  const activeRoom =
+    ownedRoom && ownedRoom.floor === game.hunter.floor
+      ? ownedRoom
+      : getRoomAt(game.player.x, game.player.y) ||
+        world.rooms.find((room) => room.floor === game.hunter.floor && room.owner);
   const hunterType = game.runProfile.hunter.id;
-  if (!ownedRoom) {
+  if (!activeRoom) {
     return;
   }
 
   if (hunterType === "stalker") {
-    const anchor = game.player.roomId === ownedRoom.id
-      ? { x: clamp(game.player.x - 40, ownedRoom.x + 26, ownedRoom.x + ownedRoom.w - 26), y: clamp(game.player.y + 24, ownedRoom.y + 26, ownedRoom.y + ownedRoom.h - 26) }
-      : { x: ownedRoom.door.centerX - 18, y: ownedRoom.door.centerY + 24 };
+    const anchor = game.player.roomId === activeRoom.id
+      ? { x: clamp(game.player.x - 40, activeRoom.x + 26, activeRoom.x + activeRoom.w - 26), y: clamp(game.player.y + 24, activeRoom.y + 26, activeRoom.y + activeRoom.h - 26) }
+      : { x: activeRoom.door.centerX - 18, y: activeRoom.door.centerY + 24 };
     game.hunter.x = anchor.x;
     game.hunter.y = anchor.y;
     game.hunter.attackCooldown = Math.min(game.hunter.attackCooldown, 0.28);
@@ -2094,7 +2190,7 @@ function castHunterSkill() {
   }
 
   if (hunterType === "juggernaut") {
-    const slamRoom = getRoomById(game.hunter.targetRoomId) || ownedRoom;
+    const slamRoom = getRoomById(game.hunter.targetRoomId) || activeRoom;
     const slamPoint = { x: slamRoom.door.centerX, y: slamRoom.door.centerY };
     spawnImpact(slamPoint.x, slamPoint.y, "amber", 1.8, 22);
     spawnSlash(game.hunter.x, game.hunter.y, slamPoint.x, slamPoint.y, "amber");
@@ -2122,10 +2218,10 @@ function castHunterSkill() {
   }
 
   if (hunterType === "brood") {
-    const spawnPoint = ownedRoom.breach
-      ? { x: ownedRoom.x + ownedRoom.w - 30, y: ownedRoom.y + ownedRoom.h / 2 }
-      : { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY };
-    spawnInfectedAt(spawnPoint.x, spawnPoint.y, 2 + game.runProfile.modifiers.blackoutSpawnBonus);
+    const spawnPoint = activeRoom.breach
+      ? { x: activeRoom.x + activeRoom.w - 30, y: activeRoom.y + activeRoom.h / 2 }
+      : { x: activeRoom.door.centerX, y: activeRoom.door.centerY };
+    spawnInfectedAt(spawnPoint.x, spawnPoint.y, 2 + game.runProfile.modifiers.blackoutSpawnBonus, activeRoom.floor);
     spawnImpact(spawnPoint.x, spawnPoint.y, "amber", 1.45, 16);
     pushLog(langText("감염 번식체가 복도에 새 감염체를 토해냈습니다.", "The Brood Host birthed fresh infected into the corridor."));
     showBanner(langText("증식 파동", "Brood Surge"), localize(game.runProfile.hunter.label), "amber", 1.15);
@@ -2159,20 +2255,23 @@ function updateHunterMode(dt) {
   }
 
   const ownedRoom = getOwnedRoom();
+  const localOwnedRoom = ownedRoom && ownedRoom.floor === hunter.floor ? ownedRoom : null;
   let nextMode = "stalk";
   if (game.blackoutActive) {
     nextMode = "rush";
   }
-  if (ownedRoom) {
-    const doorHealthRatio = ownedRoom.door.maxHp > 0 ? ownedRoom.door.hp / ownedRoom.door.maxHp : 0;
-    const defenders = game.units.filter((unit) => unit.roomId === ownedRoom.id && unit.type !== "husk").length;
-    if (ownedRoom.breach || game.player.hp < 38) {
+  if (localOwnedRoom) {
+    const doorHealthRatio = localOwnedRoom.door.maxHp > 0 ? localOwnedRoom.door.hp / localOwnedRoom.door.maxHp : 0;
+    const defenders = game.units.filter((unit) => unit.roomId === localOwnedRoom.id && unit.type !== "husk").length;
+    if (localOwnedRoom.breach || game.player.hp < 38) {
       nextMode = "enrage";
-    } else if (ownedRoom.door.closed && !ownedRoom.door.broken && doorHealthRatio < 0.5) {
+    } else if (localOwnedRoom.door.closed && !localOwnedRoom.door.broken && doorHealthRatio < 0.5) {
       nextMode = "siege";
     } else if (defenders >= 3) {
       nextMode = "rush";
     }
+  } else if (hunter.floor === game.player.floor) {
+    nextMode = distance(hunter, game.player) < 150 || game.blackoutActive ? "rush" : "stalk";
   }
 
   if (hunter.mode !== nextMode) {
@@ -2202,7 +2301,12 @@ function hunterModeProfile() {
 
 function retargetHunter() {
   const ownedRoom = getOwnedRoom();
-  const occupiedRooms = world.rooms.filter((room) => room.owner && room.owner !== "infected");
+  if (game.hunter.floor === game.player.floor && (!ownedRoom || ownedRoom.floor !== game.hunter.floor)) {
+    game.hunter.targetRoomId = null;
+    hunterSeekPoint(game.player.x, game.player.y);
+    return;
+  }
+  const occupiedRooms = world.rooms.filter((room) => room.floor === game.hunter.floor && room.owner && room.owner !== "infected");
   let best = null;
   let bestScore = -Infinity;
 
@@ -2226,7 +2330,8 @@ function retargetHunter() {
   }
 
   if (!best) {
-    hunterSeekPoint(world.hall.x + world.hall.w / 2, world.hall.y + world.hall.h / 2);
+    const fallback = floorSpawnPoint(game.hunter.floor);
+    hunterSeekPoint(fallback.x, fallback.y);
     return;
   }
 
@@ -2310,26 +2415,24 @@ function handleHunterDoorDamage() {
 }
 
 function handleHunterAttacks() {
-  const room = world.rooms.find((entry) => entry.id === game.hunter.targetRoomId);
-  if (!room) {
+  if (game.hunter.floor === game.player.floor && distance(game.hunter, game.player) < 24 && game.hunter.attackCooldown <= 0) {
+    const mode = hunterModeProfile();
+    game.hunter.attackCooldown = 0.65 * mode.cooldown;
+    game.player.hp -=
+      (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) *
+      mode.damage *
+      game.runProfile.modifiers.hunterPlayerDamageMultiplier *
+      game.runProfile.modifiers.hunterDamageMultiplier;
+    game.player.lastDamageSource = "hunter";
+    pulseShake(1.25);
+    playUiTone(150, 0.08, "square", 0.04);
+    spawnImpact(game.player.x, game.player.y, "crimson", 1.4, 16);
+    spawnSlash(game.hunter.x, game.hunter.y, game.player.x, game.player.y, "crimson");
     return;
   }
 
-  if (room.owner === "player") {
-    if (distance(game.hunter, game.player) < 24 && game.hunter.attackCooldown <= 0) {
-      const mode = hunterModeProfile();
-      game.hunter.attackCooldown = 0.65 * mode.cooldown;
-      game.player.hp -=
-        (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) *
-        mode.damage *
-        game.runProfile.modifiers.hunterPlayerDamageMultiplier *
-        game.runProfile.modifiers.hunterDamageMultiplier;
-      game.player.lastDamageSource = "hunter";
-      pulseShake(1.25);
-      playUiTone(150, 0.08, "square", 0.04);
-      spawnImpact(game.player.x, game.player.y, "crimson", 1.4, 16);
-      spawnSlash(game.hunter.x, game.hunter.y, game.player.x, game.player.y, "crimson");
-    }
+  const room = world.rooms.find((entry) => entry.id === game.hunter.targetRoomId);
+  if (!room) {
     return;
   }
 
@@ -2339,7 +2442,7 @@ function handleHunterAttacks() {
     hider.alive = false;
     room.owner = "infected";
     room.occupied = false;
-    spawnInfectedAt(room.bed.x, room.bed.y, 3);
+    spawnInfectedAt(room.bed.x, room.bed.y, 3, room.floor);
     pushLog(langText(`${room.label}이 함락됐습니다. 또 한 명이 감염됐습니다.`, `${room.label} fell. Another hider turned.`));
     pulseShake(1.1);
   }
@@ -2347,25 +2450,29 @@ function handleHunterAttacks() {
 
 function updateInfected(dt) {
   for (const enemy of game.infected) {
+    if (enemy.floor !== game.player.floor) {
+      continue;
+    }
     const target = pickInfectedTarget(enemy);
     moveEntityWithPath(enemy, target.x, target.y, enemy.speed * dt);
 
     const ownedRoom = getOwnedRoom();
+    const localOwnedRoom = ownedRoom && ownedRoom.floor === enemy.floor ? ownedRoom : null;
     if (
-      ownedRoom &&
-      ownedRoom.door.closed &&
-      !ownedRoom.door.broken &&
-      distance(enemy, { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY }) < 20
+      localOwnedRoom &&
+      localOwnedRoom.door.closed &&
+      !localOwnedRoom.door.broken &&
+      distance(enemy, { x: localOwnedRoom.door.centerX, y: localOwnedRoom.door.centerY }) < 20
     ) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = 1.1;
-        ownedRoom.door.hp -= CONFIG.infected.doorDamage * game.runProfile.modifiers.infectedDamageMultiplier;
-        spawnImpact(ownedRoom.door.centerX, ownedRoom.door.centerY, "amber", 0.7, 8);
-        if (ownedRoom.door.hp <= 0) {
-          ownedRoom.door.hp = 0;
-          ownedRoom.door.broken = true;
-          ownedRoom.door.closed = false;
+        localOwnedRoom.door.hp -= CONFIG.infected.doorDamage * game.runProfile.modifiers.infectedDamageMultiplier;
+        spawnImpact(localOwnedRoom.door.centerX, localOwnedRoom.door.centerY, "amber", 0.7, 8);
+        if (localOwnedRoom.door.hp <= 0) {
+          localOwnedRoom.door.hp = 0;
+          localOwnedRoom.door.broken = true;
+          localOwnedRoom.door.closed = false;
           pushLog(langText("감염체가 문을 씹어 뚫었습니다.", "Infected chewed through your door."));
           pulseShake(1.4);
           playUiTone(150, 0.16, "sawtooth", 0.04);
@@ -2392,25 +2499,29 @@ function updateInfected(dt) {
 
 function pickInfectedTarget(enemy) {
   const ownedRoom = getOwnedRoom();
-  if (!ownedRoom) {
+  const localOwnedRoom = ownedRoom && ownedRoom.floor === enemy.floor ? ownedRoom : null;
+  if (enemy.floor !== game.player.floor) {
+    return { x: enemy.x, y: enemy.y };
+  }
+  if (!localOwnedRoom) {
     return game.player;
   }
-  const enemyInsideOwnedRoom = pointInRect(enemy.x, enemy.y, ownedRoom);
-  if (game.player.roomId === ownedRoom.id && !enemyInsideOwnedRoom && !ownedRoom.breach) {
-    return { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY };
+  const enemyInsideOwnedRoom = pointInRect(enemy.x, enemy.y, localOwnedRoom);
+  if (game.player.roomId === localOwnedRoom.id && !enemyInsideOwnedRoom && !localOwnedRoom.breach) {
+    return { x: localOwnedRoom.door.centerX, y: localOwnedRoom.door.centerY };
   }
   if (distance(enemy, game.player) < 240) {
     return game.player;
   }
-  if (!enemyInsideOwnedRoom && ownedRoom.door.closed && !ownedRoom.door.broken) {
-    return { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY };
+  if (!enemyInsideOwnedRoom && localOwnedRoom.door.closed && !localOwnedRoom.door.broken) {
+    return { x: localOwnedRoom.door.centerX, y: localOwnedRoom.door.centerY };
   }
   return game.player;
 }
 
 function collectKeycards() {
   for (const keycard of world.keycards) {
-    if (keycard.collected || !keycard.visible) {
+    if (keycard.collected || !keycard.visible || keycard.floor !== game.player.floor) {
       continue;
     }
     if (distance(game.player, keycard) < 18) {
@@ -2431,9 +2542,10 @@ function collectKeycards() {
   }
 }
 
-function spawnInfectedAt(x, y, count) {
+function spawnInfectedAt(x, y, count, floor = game.hunter.floor) {
   for (let index = 0; index < count; index += 1) {
     game.infected.push({
+      floor,
       x: x + randomRange(-18, 18),
       y: y + randomRange(-18, 18),
       radius: 11,
@@ -2444,9 +2556,12 @@ function spawnInfectedAt(x, y, count) {
   }
 }
 
-function explodeAt(x, y, radius, damage) {
+function explodeAt(x, y, radius, damage, floor = game.hunter.floor) {
   const targets = [game.hunter, ...game.infected];
   for (const target of targets) {
+    if (target.floor !== floor) {
+      continue;
+    }
     if (distance({ x, y }, target) < radius) {
       target.hp -= damage;
     }
@@ -2458,6 +2573,9 @@ function nearestEnemy(unit, range) {
   let chosen = null;
   let bestDistance = range;
   for (const enemy of candidates) {
+    if (enemy.floor !== unit.floor) {
+      continue;
+    }
     const d = distance(unit, enemy);
     if (d < bestDistance) {
       bestDistance = d;
@@ -2530,6 +2648,9 @@ function nearestEnemyWithFilter(unit, range, predicate) {
   let chosen = null;
   let bestDistance = range;
   for (const enemy of candidates) {
+    if (enemy.floor !== unit.floor) {
+      continue;
+    }
     if (!predicate(enemy)) {
       continue;
     }
@@ -2546,6 +2667,19 @@ function countBreaches() {
   return world.rooms.filter((room) => room.breach).length;
 }
 
+function floorSpawnPoint(floor) {
+  if (floor === "f2") {
+    return {
+      x: world.upperHall.x + world.upperHall.w / 2,
+      y: world.upperHall.y + 86,
+    };
+  }
+  return {
+    x: world.hall.x + world.hall.w / 2,
+    y: world.hall.y + 86,
+  };
+}
+
 function moveTowardTarget(entity, x, y, amount) {
   const dx = x - entity.x;
   const dy = y - entity.y;
@@ -2557,7 +2691,7 @@ function moveTowardTarget(entity, x, y, amount) {
 }
 
 function moveEntityWithPath(entity, x, y, amount) {
-  const waypoint = getNextWaypoint(entity.x, entity.y, x, y);
+  const waypoint = getNextWaypoint(entity.x, entity.y, x, y, entity.floor || game.player.floor);
   if (waypoint) {
     moveTowardTarget(entity, waypoint.x, waypoint.y, amount);
     return;
@@ -2567,7 +2701,7 @@ function moveEntityWithPath(entity, x, y, amount) {
 
 function buildNavGraph(currentWorld) {
   const nodes = [];
-  const pushNode = (id, x, y) => nodes.push({ id, x, y, links: [] });
+  const pushNode = (id, x, y, floor) => nodes.push({ id, x, y, floor, links: [] });
   const link = (a, b) => {
     const from = nodes.find((node) => node.id === a);
     const to = nodes.find((node) => node.id === b);
@@ -2583,13 +2717,13 @@ function buildNavGraph(currentWorld) {
     const x = currentWorld.hall.x + 180 + index * ((currentWorld.hall.w - 360) / 4);
     const y = currentWorld.hall.y + currentWorld.hall.h / 2;
     hallHubs.push({ id, x, y });
-    pushNode(id, x, y);
+    pushNode(id, x, y, "f1");
     if (index > 0) {
       link(`hallHub${index - 1}`, id);
     }
   }
-  pushNode("exitConnector", currentWorld.exitConnector.x + currentWorld.exitConnector.w / 2, currentWorld.exitConnector.y + currentWorld.exitConnector.h / 2);
-  pushNode("generatorConnector", currentWorld.generatorConnector.x + currentWorld.generatorConnector.w / 2, currentWorld.generatorConnector.y + currentWorld.generatorConnector.h / 2);
+  pushNode("exitConnector", currentWorld.exitConnector.x + currentWorld.exitConnector.w / 2, currentWorld.exitConnector.y + currentWorld.exitConnector.h / 2, "f1");
+  pushNode("generatorConnector", currentWorld.generatorConnector.x + currentWorld.generatorConnector.w / 2, currentWorld.generatorConnector.y + currentWorld.generatorConnector.h / 2, "f1");
 
   link("hallHub4", "exitConnector");
   link("hallHub4", "generatorConnector");
@@ -2597,8 +2731,11 @@ function buildNavGraph(currentWorld) {
   for (const room of currentWorld.rooms) {
     const doorId = `${room.id}Door`;
     const roomId = `${room.id}Room`;
-    pushNode(doorId, room.door.centerX, room.door.centerY + (room.y < currentWorld.hall.y ? 28 : -28));
-    pushNode(roomId, room.x + room.w / 2, room.y + room.h / 2);
+    pushNode(doorId, room.door.centerX, room.door.centerY + (room.y < currentWorld.hall.y ? 28 : -28), room.floor);
+    pushNode(roomId, room.x + room.w / 2, room.y + room.h / 2, room.floor);
+    if (room.floor !== "f1") {
+      continue;
+    }
     let closestHub = hallHubs[0].id;
     let bestDistance = Infinity;
     for (const hub of hallHubs) {
@@ -2612,22 +2749,49 @@ function buildNavGraph(currentWorld) {
     link(doorId, roomId);
   }
 
-  pushNode("generatorDoor", currentWorld.generatorRoom.door.centerX, currentWorld.generatorRoom.door.centerY - 30);
-  pushNode("generatorRoom", currentWorld.generatorRoom.x + currentWorld.generatorRoom.w / 2, currentWorld.generatorRoom.y + currentWorld.generatorRoom.h / 2);
-  pushNode("exitDoor", currentWorld.exitRoom.gate.centerX + 34, currentWorld.exitRoom.gate.centerY);
-  pushNode("exitRoom", currentWorld.exitRoom.x + currentWorld.exitRoom.w / 2, currentWorld.exitRoom.y + currentWorld.exitRoom.h / 2);
+  pushNode("generatorDoor", currentWorld.generatorRoom.door.centerX, currentWorld.generatorRoom.door.centerY - 30, "f1");
+  pushNode("generatorRoom", currentWorld.generatorRoom.x + currentWorld.generatorRoom.w / 2, currentWorld.generatorRoom.y + currentWorld.generatorRoom.h / 2, "f1");
+  pushNode("exitDoor", currentWorld.exitRoom.gate.centerX + 34, currentWorld.exitRoom.gate.centerY, "f1");
+  pushNode("exitRoom", currentWorld.exitRoom.x + currentWorld.exitRoom.w / 2, currentWorld.exitRoom.y + currentWorld.exitRoom.h / 2, "f1");
 
   link("generatorConnector", "generatorDoor");
   link("generatorDoor", "generatorRoom");
   link("exitConnector", "exitDoor");
   link("exitDoor", "exitRoom");
 
+  const upperHubs = [];
+  for (let index = 0; index < 3; index += 1) {
+    const id = `upperHub${index}`;
+    const x = currentWorld.upperHall.x + 170 + index * ((currentWorld.upperHall.w - 340) / 2);
+    const y = currentWorld.upperHall.y + currentWorld.upperHall.h / 2;
+    upperHubs.push({ id, x, y });
+    pushNode(id, x, y, "f2");
+    if (index > 0) {
+      link(`upperHub${index - 1}`, id);
+    }
+  }
+
+  for (const room of currentWorld.rooms.filter((entry) => entry.floor === "f2")) {
+    const doorId = `${room.id}Door`;
+    let closestHub = upperHubs[0].id;
+    let bestDistance = Infinity;
+    for (const hub of upperHubs) {
+      const d = Math.abs(room.door.centerX - hub.x);
+      if (d < bestDistance) {
+        bestDistance = d;
+        closestHub = hub.id;
+      }
+    }
+    link(closestHub, doorId);
+    link(doorId, `${room.id}Room`);
+  }
+
   return nodes;
 }
 
-function getNextWaypoint(fromX, fromY, targetX, targetY) {
-  const start = nearestNavNode(fromX, fromY);
-  const goal = nearestNavNode(targetX, targetY);
+function getNextWaypoint(fromX, fromY, targetX, targetY, floor) {
+  const start = nearestNavNode(fromX, fromY, floor);
+  const goal = nearestNavNode(targetX, targetY, floor);
   if (!start || !goal || start.id === goal.id) {
     return null;
   }
@@ -2663,10 +2827,13 @@ function getNextWaypoint(fromX, fromY, targetX, targetY) {
   return navGraph.find((node) => node.id === stepId) || null;
 }
 
-function nearestNavNode(x, y) {
+function nearestNavNode(x, y, floor) {
   let chosen = null;
   let bestDistance = Infinity;
   for (const node of navGraph) {
+    if (node.floor !== floor) {
+      continue;
+    }
     const d = distance({ x, y }, node);
     if (d < bestDistance) {
       bestDistance = d;
@@ -2678,27 +2845,27 @@ function nearestNavNode(x, y) {
 
 function moveEntity(entity, dx, dy) {
   const nextX = entity.x + dx;
-  if (canMoveTo(nextX, entity.y, entity.radius)) {
+  if (canMoveTo(nextX, entity.y, entity.radius, entity.floor || game.player.floor)) {
     entity.x = nextX;
   }
   const nextY = entity.y + dy;
-  if (canMoveTo(entity.x, nextY, entity.radius)) {
+  if (canMoveTo(entity.x, nextY, entity.radius, entity.floor || game.player.floor)) {
     entity.y = nextY;
   }
 }
 
-function canMoveTo(x, y, radius) {
-  if (!world.zones.some((zone) => pointInRect(x, y, zone))) {
+function canMoveTo(x, y, radius, floor = game.player.floor) {
+  if (!world.zones.some((zone) => zone.floor === floor && pointInRect(x, y, zone))) {
     return false;
   }
 
-  const colliders = [...world.barriers];
+  const colliders = world.barriers.filter((rect) => rect.floor === floor);
   for (const room of world.rooms) {
-    if (room.door.closed && !room.door.broken) {
+    if (room.floor === floor && room.door.closed && !room.door.broken) {
       colliders.push(room.door);
     }
   }
-  if (world.exitRoom.gate.closed) {
+  if (world.exitRoom.floor === floor && world.exitRoom.gate.closed) {
     colliders.push(world.exitRoom.gate);
   }
 
@@ -2800,6 +2967,9 @@ function drawAtmosphere() {
 
 function drawZones() {
   for (const zone of world.zones) {
+    if (zone.floor !== game.player.floor) {
+      continue;
+    }
     const fill = zone.id === "hall" ? "#131a28" : "#111827";
     ctx.fillStyle = fill;
     ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
@@ -2813,10 +2983,16 @@ function drawZones() {
   ctx.strokeStyle = "rgba(166, 204, 255, 0.16)";
   ctx.lineWidth = 2.5;
   for (const zone of world.zones) {
+    if (zone.floor !== game.player.floor) {
+      continue;
+    }
     ctx.strokeRect(zone.x, zone.y, zone.w, zone.h);
   }
 
   for (const room of world.rooms) {
+    if (room.floor !== game.player.floor) {
+      continue;
+    }
     drawCelOrb(room.bed.x, room.bed.y, room.bed.radius, colors.bed, "#e6fdff", 0.18);
     drawCelOrb(room.altar.x, room.altar.y, room.altar.radius, colors.altar, "#ffd0b8", 0.12);
     drawCelOrb(room.terminal.x, room.terminal.y, room.terminal.radius, colors.terminal, "#b8efff", 0.12);
@@ -2838,13 +3014,27 @@ function drawZones() {
     ctx.fillText(room.label.toUpperCase(), room.x + 14, room.y + 22);
   }
 
-  drawCelOrb(world.generator.x, world.generator.y, world.generator.radius, colors.generator, "#f8f7bf", 0.15);
-  drawCelOrb(world.exitRoom.x + 68, world.exitRoom.y + 70, 24, colors.exit, "#ddf5ff", 0.15);
+  if (world.generatorRoom.floor === game.player.floor) {
+    drawCelOrb(world.generator.x, world.generator.y, world.generator.radius, colors.generator, "#f8f7bf", 0.15);
+  }
+  if (world.exitRoom.floor === game.player.floor) {
+    drawCelOrb(world.exitRoom.x + 68, world.exitRoom.y + 70, 24, colors.exit, "#ddf5ff", 0.15);
+  }
+
+  for (const elevator of world.elevators) {
+    if (elevator.floor !== game.player.floor) {
+      continue;
+    }
+    drawCelOrb(elevator.x, elevator.y, elevator.radius, "#4f4c78", "#ddf5ff", 0.15);
+    ctx.strokeStyle = "rgba(221, 245, 255, 0.42)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(elevator.x - 18, elevator.y - 18, 36, 36);
+  }
 }
 
 function drawKeycards() {
   for (const keycard of world.keycards) {
-    if (!keycard.visible || keycard.collected) {
+    if (!keycard.visible || keycard.collected || keycard.floor !== game.player.floor) {
       continue;
     }
     drawDiamond(keycard.x, keycard.y, 12, "#ffd36b");
@@ -2856,6 +3046,9 @@ function drawKeycards() {
 
 function drawUnits() {
   for (const unit of game.units) {
+    if (unit.floor !== game.player.floor) {
+      continue;
+    }
     const color = colors[unit.type];
     const bob = Math.sin(game.time * 2.8 + unit.x * 0.02 + unit.y * 0.01) * 3;
     const radius = unit.type === "relic" ? 13 : 11;
@@ -2874,22 +3067,30 @@ function drawUnits() {
 
 function drawActors() {
   drawCharacter(game.player, "player");
-  drawCharacter(game.hunter, "hunter");
+  if (game.hunter.floor === game.player.floor) {
+    drawCharacter(game.hunter, "hunter");
+  }
 
   for (const hider of game.hiders) {
-    if (!hider.alive) {
+    if (!hider.alive || hider.floor !== game.player.floor) {
       continue;
     }
     drawCharacter(hider, "hider");
   }
 
   for (const enemy of game.infected) {
+    if (enemy.floor !== game.player.floor) {
+      continue;
+    }
     drawCharacter(enemy, "infected");
   }
 }
 
 function drawDoors() {
   for (const room of world.rooms) {
+    if (room.floor !== game.player.floor) {
+      continue;
+    }
     const hpPct = clamp(room.door.hp / room.door.maxHp, 0, 1);
     const shake = room.door.closed && hpPct < 0.45 ? Math.sin(game.time * 22 + room.door.centerX) * (1 - hpPct) * 2.5 : 0;
     ctx.save();
@@ -2911,8 +3112,10 @@ function drawDoors() {
     ctx.restore();
   }
 
-  ctx.fillStyle = world.exitRoom.gate.closed ? "#634646" : "#3d6e63";
-  ctx.fillRect(world.exitRoom.gate.x, world.exitRoom.gate.y, world.exitRoom.gate.w, world.exitRoom.gate.h);
+  if (world.exitRoom.floor === game.player.floor) {
+    ctx.fillStyle = world.exitRoom.gate.closed ? "#634646" : "#3d6e63";
+    ctx.fillRect(world.exitRoom.gate.x, world.exitRoom.gate.y, world.exitRoom.gate.w, world.exitRoom.gate.h);
+  }
 }
 
 function drawLighting() {
@@ -2937,7 +3140,7 @@ function drawLighting() {
 
   if (!game.blackoutActive) {
     const ownedRoom = getOwnedRoom();
-    if (ownedRoom) {
+    if (ownedRoom && ownedRoom.floor === game.player.floor) {
       const roomCenter = worldToScreen({ x: ownedRoom.x + ownedRoom.w / 2, y: ownedRoom.y + ownedRoom.h / 2 });
       const roomLight = ctx.createRadialGradient(
         roomCenter.x,
@@ -2958,6 +3161,9 @@ function drawLighting() {
 
   if (game.radarTime > 0) {
     for (const enemy of [game.hunter, ...game.infected]) {
+      if (enemy.floor !== game.player.floor) {
+        continue;
+      }
       const screenEnemy = worldToScreen(enemy);
       ctx.beginPath();
       ctx.arc(screenEnemy.x, screenEnemy.y, 40, 0, Math.PI * 2);
@@ -2994,6 +3200,9 @@ function drawHudMap() {
   const revealTier = game.fragments >= 6 ? 3 : game.fragments >= 4 ? 2 : game.fragments >= 2 ? 1 : 0;
 
   const shownZones = world.zones.filter((zone) => {
+    if (zone.floor !== game.player.floor) {
+      return false;
+    }
     if (revealTier === 3) {
       return true;
     }
