@@ -492,6 +492,10 @@ canvas {
   gap: 12px;
 }
 
+.sidebar.collapsed {
+  display: none;
+}
+
 .panel {
   padding: 14px 16px;
   background:
@@ -638,6 +642,10 @@ canvas {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   }
+
+  .sidebar.collapsed {
+    display: none;
+  }
 }
 
 @media (pointer: coarse), (max-width: 900px) {
@@ -713,6 +721,10 @@ canvas {
     width: calc(100% - 28px);
     bottom: 132px;
     padding: 12px 14px;
+  }
+
+  .sidebar {
+    gap: 10px;
   }
 
   .mobile-stick {

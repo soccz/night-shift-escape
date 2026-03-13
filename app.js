@@ -24,6 +24,7 @@ const controlsList = document.getElementById("controlsList");
 const logHeading = document.getElementById("logHeading");
 const metaHeading = document.getElementById("metaHeading");
 const languageButton = document.getElementById("languageButton");
+const hudToggleButton = document.getElementById("hudToggleButton");
 const muteButton = document.getElementById("muteButton");
 const pauseButton = document.getElementById("pauseButton");
 const dockModeButton = document.getElementById("dockModeButton");
@@ -39,6 +40,7 @@ const resumeButton = document.getElementById("resumeButton");
 const pauseMuteButton = document.getElementById("pauseMuteButton");
 const mobileStick = document.getElementById("mobileStick");
 const mobileStickThumb = document.getElementById("mobileStickThumb");
+const sidebar = document.getElementById("sidebar");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -47,6 +49,8 @@ const I18N = {
   ko: {
     subtitle: "브라우저용 애니 호러 솔로 디펜스 런.",
     themeChip: "셀 호러 HUD",
+    hud_show: "HUD 열기",
+    hud_hide: "HUD 닫기",
     mute: "사운드",
     mute_on: "사운드 켬",
     mute_off: "사운드 끔",
@@ -122,6 +126,8 @@ const I18N = {
   en: {
     subtitle: "Anime-horror solo defense run for the browser.",
     themeChip: "Cel Horror HUD",
+    hud_show: "Show HUD",
+    hud_hide: "Hide HUD",
     mute: "Sound",
     mute_on: "Sound On",
     mute_off: "Sound Off",
@@ -471,6 +477,25 @@ const RUN_OMENS = [
   },
 ];
 
+const HUNTER_SKILLS = {
+  stalker: {
+    cooldownMin: 12,
+    cooldownMax: 18,
+  },
+  juggernaut: {
+    cooldownMin: 13,
+    cooldownMax: 20,
+  },
+  brood: {
+    cooldownMin: 14,
+    cooldownMax: 21,
+  },
+  warden: {
+    cooldownMin: 15,
+    cooldownMax: 22,
+  },
+};
+
 const keys = new Set();
 const state = {
   runStartedAt: performance.now(),
@@ -482,6 +507,7 @@ const state = {
   nextUnitId: 1,
   adminMode: false,
   paused: false,
+  sidebarCollapsed: window.matchMedia && window.matchMedia("(max-width: 1120px)").matches,
   screenShake: 0,
   audio: createAudioState(),
   effects: [],
@@ -844,6 +870,10 @@ function createGame() {
     level: 1,
     mode: "stalk",
     modeTimer: 0,
+    skillCooldown: randomRange(
+      HUNTER_SKILLS[runProfile.hunter.id].cooldownMin,
+      HUNTER_SKILLS[runProfile.hunter.id].cooldownMax,
+    ),
   };
 
   const assigned = new Map([
@@ -896,6 +926,7 @@ function createGame() {
     blackoutActive: false,
     blackoutTimer: rollBlackoutTimer(runProfile),
     blackoutDuration: 0,
+    suppressionTime: 0,
     mutationClock: 0,
     repairNoise: 0,
     intelNoise: 0,
@@ -1033,6 +1064,7 @@ function applyStaticText() {
   document.documentElement.lang = state.lang;
   subtitleText.textContent = t("subtitle");
   themeChip.textContent = t("themeChip");
+  hudToggleButton.textContent = state.sidebarCollapsed ? t("hud_show") : t("hud_hide");
   muteButton.textContent = state.audio.muted ? t("mute_off") : t("mute_on");
   pauseButton.textContent = state.paused ? t("resume") : t("pause");
   restartButton.textContent = t("restart");
@@ -1057,6 +1089,7 @@ function applyStaticText() {
   dockInteractButton.textContent = t("dock_interact");
   dockReinforceButton.textContent = t("dock_reinforce");
   languageButton.textContent = state.lang === "ko" ? "EN" : "KO";
+  sidebar.classList.toggle("collapsed", state.sidebarCollapsed);
   controlsList.innerHTML = I18N[state.lang].controls
     .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
     .join("");
@@ -1065,6 +1098,10 @@ function applyStaticText() {
 restartButton.addEventListener("click", resetGame);
 startButton.addEventListener("click", startRun);
 languageButton.addEventListener("click", toggleLanguage);
+hudToggleButton.addEventListener("click", () => {
+  state.sidebarCollapsed = !state.sidebarCollapsed;
+  applyStaticText();
+});
 muteButton.addEventListener("click", toggleMute);
 pauseButton.addEventListener("click", () => {
   togglePause();
@@ -1216,6 +1253,13 @@ canvas.addEventListener(
 document.addEventListener("visibilitychange", () => {
   if (document.hidden && !state.titleVisible && game.phase === "running") {
     setPaused(true);
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 1120 && state.sidebarCollapsed) {
+    state.sidebarCollapsed = false;
+    applyStaticText();
   }
 });
 
@@ -1664,6 +1708,7 @@ function update(dt) {
   game.time += dt;
   game.radarTime = Math.max(0, game.radarTime - dt);
   game.compassTime = Math.max(0, game.compassTime - dt);
+  game.suppressionTime = Math.max(0, game.suppressionTime - dt);
   game.intelNoise = Math.max(0, game.intelNoise - dt);
   state.screenShake = Math.max(0, state.screenShake - dt * CONFIG.feedback.shakeDecayPerSecond);
   updateEffects(dt);
@@ -1904,7 +1949,7 @@ function updateUnits(dt) {
     const localTarget = selectUnitTarget(unit, unitRoom);
     updateUnitPosition(unit, localTarget, dt);
 
-    if (game.blackoutActive) {
+    if (game.blackoutActive || game.suppressionTime > 0) {
       continue;
     }
 
@@ -1969,9 +2014,93 @@ function updateHunter(dt) {
     hunter.retargetTimer = 0.8;
   }
 
+  hunter.skillCooldown -= dt;
+  if (hunter.skillCooldown <= 0) {
+    castHunterSkill();
+    const skillProfile = HUNTER_SKILLS[game.runProfile.hunter.id];
+    hunter.skillCooldown = randomRange(skillProfile.cooldownMin, skillProfile.cooldownMax);
+  }
+
   moveEntityWithPath(hunter, hunter.targetX, hunter.targetY, hunter.speed * dt);
   handleHunterDoorDamage();
   handleHunterAttacks();
+}
+
+function castHunterSkill() {
+  const ownedRoom = getOwnedRoom();
+  const hunterType = game.runProfile.hunter.id;
+  if (!ownedRoom) {
+    return;
+  }
+
+  if (hunterType === "stalker") {
+    const anchor = game.player.roomId === ownedRoom.id
+      ? { x: clamp(game.player.x - 40, ownedRoom.x + 26, ownedRoom.x + ownedRoom.w - 26), y: clamp(game.player.y + 24, ownedRoom.y + 26, ownedRoom.y + ownedRoom.h - 26) }
+      : { x: ownedRoom.door.centerX - 18, y: ownedRoom.door.centerY + 24 };
+    game.hunter.x = anchor.x;
+    game.hunter.y = anchor.y;
+    game.hunter.attackCooldown = Math.min(game.hunter.attackCooldown, 0.28);
+    spawnImpact(anchor.x, anchor.y, "crimson", 1.55, 18);
+    flashScreen("rgba(255, 76, 136, 0.16)", 0.3, 0.12);
+    pushLog(langText("그림자 추적자가 위치를 비틀어 나타났습니다.", "The Shadow Stalker warped through the ward."));
+    showBanner(langText("그림자 도약", "Shadow Warp"), localize(game.runProfile.hunter.label), "crimson", 1.15);
+    playUiTone(98, 0.22, "sawtooth", 0.05);
+    pulseShake(1.4);
+    return;
+  }
+
+  if (hunterType === "juggernaut") {
+    const slamRoom = getRoomById(game.hunter.targetRoomId) || ownedRoom;
+    const slamPoint = { x: slamRoom.door.centerX, y: slamRoom.door.centerY };
+    spawnImpact(slamPoint.x, slamPoint.y, "amber", 1.8, 22);
+    spawnSlash(game.hunter.x, game.hunter.y, slamPoint.x, slamPoint.y, "amber");
+    if (slamRoom.door.closed && !slamRoom.door.broken) {
+      slamRoom.door.hp -= 58 * game.runProfile.modifiers.hunterDoorDamageMultiplier;
+      if (slamRoom.door.hp <= 0) {
+        slamRoom.door.hp = 0;
+        slamRoom.door.closed = false;
+        slamRoom.door.broken = true;
+      }
+    }
+    for (const unit of game.units) {
+      if (unit.roomId === slamRoom.id && distance(unit, slamPoint) < 90) {
+        unit.cooldown = Math.max(unit.cooldown, 1.6);
+        if (unit.type === "husk") {
+          unit.life = Math.min(unit.life, 0.2);
+        }
+      }
+    }
+    pushLog(langText("공성 괴수가 문을 내리찍었습니다.", "The Siege Juggernaut slammed the door line."));
+    showBanner(langText("공성 강타", "Siege Slam"), localize(game.runProfile.hunter.label), "amber", 1.15);
+    playUiTone(82, 0.28, "square", 0.055);
+    pulseShake(2.1);
+    return;
+  }
+
+  if (hunterType === "brood") {
+    const spawnPoint = ownedRoom.breach
+      ? { x: ownedRoom.x + ownedRoom.w - 30, y: ownedRoom.y + ownedRoom.h / 2 }
+      : { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY };
+    spawnInfectedAt(spawnPoint.x, spawnPoint.y, 2 + game.runProfile.modifiers.blackoutSpawnBonus);
+    spawnImpact(spawnPoint.x, spawnPoint.y, "amber", 1.45, 16);
+    pushLog(langText("감염 번식체가 복도에 새 감염체를 토해냈습니다.", "The Brood Host birthed fresh infected into the corridor."));
+    showBanner(langText("증식 파동", "Brood Surge"), localize(game.runProfile.hunter.label), "amber", 1.15);
+    playUiTone(122, 0.26, "sawtooth", 0.05);
+    pulseShake(1.6);
+    return;
+  }
+
+  if (hunterType === "warden") {
+    game.suppressionTime = Math.max(game.suppressionTime, 6.5);
+    game.radarTime = Math.min(game.radarTime, 2.5);
+    game.compassTime = Math.min(game.compassTime, 2.5);
+    spawnImpact(game.player.x, game.player.y, "violet", 1.5, 18);
+    flashScreen("rgba(168, 122, 255, 0.16)", 0.28, 0.14);
+    pushLog(langText("정전 집행관이 방어 장치를 마비시켰습니다.", "The Blackout Warden suppressed active defenses."));
+    showBanner(langText("억제 장막", "Suppression Veil"), localize(game.runProfile.hunter.label), "violet", 1.15);
+    playUiTone(108, 0.24, "triangle", 0.05);
+    pulseShake(1.5);
+  }
 }
 
 function hunterMaxHp() {
@@ -3026,17 +3155,22 @@ function drawPulseRing(x, y, radius, color) {
 
 function drawThreatOverlay() {
   const danger = dangerLevel();
-  if (danger < 0.12) {
+  if (danger < 0.12 && game.suppressionTime <= 0) {
     return;
   }
 
-  const alpha = clamp(danger * 0.55, 0, 0.55);
+  const alpha = clamp(danger * 0.55 + (game.suppressionTime > 0 ? 0.18 : 0), 0, 0.55);
   const pulse = 1 + Math.sin(game.time * 8) * 0.08;
-  ctx.fillStyle = `rgba(255, 62, 116, ${alpha})`;
+  ctx.fillStyle = game.suppressionTime > 0 ? `rgba(187, 122, 255, ${alpha})` : `rgba(255, 62, 116, ${alpha})`;
   ctx.fillRect(24, HEIGHT - 72, 240 * pulse, 28);
   ctx.fillStyle = "#fff3f8";
   ctx.font = "700 16px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-  ctx.fillText(game.blackoutActive ? "BLACKOUT ALERT" : "THREAT RISING", 38, HEIGHT - 50);
+  const label = game.suppressionTime > 0
+    ? langText("억제 장막", "SUPPRESSION FIELD")
+    : game.blackoutActive
+      ? langText("정전 경보", "BLACKOUT ALERT")
+      : langText("위협 상승", "THREAT RISING");
+  ctx.fillText(label, 38, HEIGHT - 50);
 }
 
 function drawBanner() {
@@ -3375,6 +3509,16 @@ function renderHud() {
 
   const prompt = getPrompt();
   promptEl.textContent = prompt ? prompt.text : t("prompt_none");
+  if (game.suppressionTime > 0) {
+    helpText.textContent = langText(
+      `억제 장막 ${game.suppressionTime.toFixed(1)}초 남음. 수호자들이 멈췄습니다.`,
+      `Suppression field ${game.suppressionTime.toFixed(1)}s remaining. Guardians are stalled.`,
+    );
+  } else if (state.paused) {
+    helpText.textContent = langText("정지 중입니다. 계속 버튼이나 Esc/P로 복귀하세요.", "Paused. Resume with the button or Esc/P.");
+  } else {
+    helpText.textContent = t("helpText");
+  }
 
   logEl.innerHTML = state.logs
     .slice(-8)
@@ -3495,6 +3639,7 @@ function createAudioState() {
     context: null,
     unlocked: false,
     muted: loadMutePreference(),
+    ambient: null,
   };
 }
 
@@ -3512,6 +3657,7 @@ function ensureAudio() {
     if (state.audio.context.state === "suspended") {
       state.audio.context.resume();
     }
+    ensureAmbientLoop();
     state.audio.unlocked = true;
   } catch {
     state.audio.unlocked = false;
@@ -3539,6 +3685,64 @@ function playUiTone(frequency, duration, type, volume) {
   oscillator.stop(start + duration);
 }
 
+function ensureAmbientLoop() {
+  if (!state.audio.context || state.audio.ambient) {
+    return;
+  }
+  const context = state.audio.context;
+  const master = context.createGain();
+  const drone = context.createOscillator();
+  const shimmer = context.createOscillator();
+  const filter = context.createBiquadFilter();
+
+  drone.type = "sine";
+  drone.frequency.setValueAtTime(58, context.currentTime);
+  shimmer.type = "triangle";
+  shimmer.frequency.setValueAtTime(121, context.currentTime);
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(420, context.currentTime);
+  master.gain.setValueAtTime(0.0001, context.currentTime);
+
+  drone.connect(filter);
+  shimmer.connect(filter);
+  filter.connect(master);
+  master.connect(context.destination);
+
+  drone.start();
+  shimmer.start();
+
+  state.audio.ambient = {
+    master,
+    drone,
+    shimmer,
+    filter,
+  };
+}
+
+function updateAmbientAudio() {
+  if (!state.audio.unlocked || !state.audio.context || !state.audio.ambient) {
+    return;
+  }
+  const { context, ambient } = state.audio;
+  const now = context.currentTime;
+  const danger = dangerLevel();
+  const pausedFactor = state.paused || state.titleVisible ? 0.25 : 1;
+  const suppressionFactor = game.suppressionTime > 0 ? 0.18 : 0;
+  const targetGain = state.audio.muted ? 0.0001 : (0.012 + danger * 0.028 + suppressionFactor) * pausedFactor;
+  const targetFilter = game.blackoutActive ? 260 : 380 + danger * 260;
+  const droneFreq = 54 + danger * 14 + (game.blackoutActive ? 6 : 0);
+  const shimmerFreq = 118 + danger * 22 + (game.suppressionTime > 0 ? 20 : 0);
+
+  ambient.master.gain.cancelScheduledValues(now);
+  ambient.master.gain.setTargetAtTime(targetGain, now, 0.24);
+  ambient.filter.frequency.cancelScheduledValues(now);
+  ambient.filter.frequency.setTargetAtTime(targetFilter, now, 0.28);
+  ambient.drone.frequency.cancelScheduledValues(now);
+  ambient.drone.frequency.setTargetAtTime(droneFreq, now, 0.28);
+  ambient.shimmer.frequency.cancelScheduledValues(now);
+  ambient.shimmer.frequency.setTargetAtTime(shimmerFreq, now, 0.28);
+}
+
 function loadMutePreference() {
   try {
     return localStorage.getItem("night-shift-escape-muted") === "1";
@@ -3557,6 +3761,7 @@ function loop(now) {
   const dt = Math.min(0.033, (now - state.lastFrame) / 1000);
   state.lastFrame = now;
   update(dt);
+  updateAmbientAudio();
   draw();
   renderHud();
   requestAnimationFrame(loop);
