@@ -4484,30 +4484,49 @@ function drawTracerEffect(effect) {
 
 function renderHud() {
   const ownedRoom = getOwnedRoom();
-  const stats = [
-    [t("stat_health"), `${Math.ceil(game.player.hp)} / ${game.player.maxHp}`, game.player.hp < 30 ? "danger" : ""],
+  const primaryStats = [
+    [t("stat_health"), `${Math.ceil(game.player.hp)}`, game.player.hp < 30 ? "danger" : ""],
     [t("stat_gold"), `${Math.floor(game.gold)}`, "gold"],
     [t("stat_time"), formatTime(game.time), ""],
+  ];
+  const secondaryStats = [
     [t("stat_floor"), formatFloorName(game.player.floor), ""],
-    [t("stat_movement"), t(`movement_${state.movementMode}`), ""],
-    [t("stat_admin"), state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
     [t("stat_room"), ownedRoom ? ownedRoom.label : t("room_none"), ""],
-    [t("stat_hunter"), localize(game.runProfile.hunter.label), "danger"],
-    [t("stat_boon"), localize(game.runProfile.boon.label), "gold"],
-    [t("stat_omen"), localize(game.runProfile.omen.label), "danger"],
-    [t("stat_contract"), formatContractStatus(), game.contract ? "gold" : ""],
-    [t("stat_anomaly"), formatAnomalyStatus(), game.anomaly ? "danger" : ""],
+    [t("stat_blackout"), game.blackoutActive ? langText("활성", "ACTIVE") : `${Math.ceil(game.blackoutTimer)}s`, game.blackoutActive ? "danger" : ""],
     [t("stat_fragments"), `${game.fragments} / 6`, ""],
     [t("stat_sigils"), `${game.keycardsCollected} / 2`, ""],
-    [t("stat_blackout"), game.blackoutActive ? langText("활성", "ACTIVE") : `${Math.ceil(game.blackoutTimer)}s`, game.blackoutActive ? "danger" : ""],
+    [t("stat_contract"), formatContractStatus(), game.contract ? "gold" : ""],
+    [t("stat_anomaly"), formatAnomalyStatus(), game.anomaly ? "danger" : ""],
+    [t("stat_hunter"), localize(game.runProfile.hunter.label), "danger"],
+    [t("stat_admin"), state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
   ];
 
-  statsEl.innerHTML = stats
-    .map(
-      ([label, value, className]) =>
-        `<div class="stat-row"><span>${label}</span><strong class="${className}">${value}</strong></div>`,
-    )
-    .join("");
+  statsEl.innerHTML = `
+    <div class="stats-primary">
+      ${primaryStats
+        .map(
+          ([label, value, className]) => `
+            <div class="stat-card">
+              <span>${label}</span>
+              <strong class="${className}">${value}</strong>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+    <div class="stats-secondary">
+      ${secondaryStats
+        .map(
+          ([label, value, className]) => `
+            <div class="stat-chip">
+              <span>${label}</span>
+              <strong class="${className}">${value}</strong>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
 
   const metaRows = [
     [t("meta_runs"), String(state.meta.runs)],
@@ -4539,7 +4558,7 @@ function renderHud() {
   objectiveEl.textContent = ownedObjective;
 
   const prompt = getPrompt();
-  promptEl.textContent = prompt ? prompt.text : t("prompt_none");
+  promptEl.textContent = prompt ? `${langText("지금 할 행동", "Next Action")}: ${prompt.text}` : `${langText("지금 할 행동", "Next Action")}: ${t("prompt_none")}`;
   if (game.suppressionTime > 0) {
     helpText.textContent = langText(
       `억제 장막 ${game.suppressionTime.toFixed(1)}초 남음. 수호자들이 멈췄습니다.`,

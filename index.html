@@ -44,6 +44,18 @@
               <p id="objectiveText"></p>
               <p id="promptText"></p>
             </div>
+            <div class="hud-cluster hud-cluster-left">
+              <section class="hud-panel hud-panel-player">
+                <h2 id="runHeading">현재 런</h2>
+                <div class="stats" id="stats"></div>
+              </section>
+            </div>
+            <div class="hud-cluster hud-cluster-right">
+              <section class="hud-panel hud-panel-log">
+                <h2 id="logHeading">이벤트 로그</h2>
+                <div class="log" id="log"></div>
+              </section>
+            </div>
             <div class="quick-help" id="quickHelpCard">
               <h2 id="helpHeading">빠른 도움말</h2>
               <p id="helpText"></p>
@@ -75,18 +87,8 @@
 
         <aside class="sidebar" id="sidebar">
           <section class="panel">
-            <h2 id="runHeading">현재 런</h2>
-            <div class="stats" id="stats"></div>
-          </section>
-
-          <section class="panel">
             <h2 id="controlsHeading">조작</h2>
             <ul class="controls" id="controlsList"></ul>
-          </section>
-
-          <section class="panel">
-            <h2 id="logHeading">이벤트 로그</h2>
-            <div class="log" id="log"></div>
           </section>
 
           <section class="panel">
