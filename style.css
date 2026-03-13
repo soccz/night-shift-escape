@@ -85,6 +85,7 @@ body::after {
   box-shadow:
     0 24px 80px rgba(0, 0, 0, 0.34),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: title-drift 6s ease-in-out infinite;
 }
 
 .eyebrow {
@@ -155,6 +156,7 @@ button {
     0 16px 36px rgba(0, 0, 0, 0.28),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   transition: transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  animation: button-breath 3.8s ease-in-out infinite;
 }
 
 button:hover {
@@ -256,7 +258,7 @@ button:hover {
   box-shadow:
     0 28px 80px rgba(0, 0, 0, 0.4),
     0 0 40px rgba(133, 216, 255, 0.1);
-  animation: panel-rise 480ms ease both;
+  animation: panel-rise 480ms ease both, title-drift 5.6s ease-in-out infinite;
 }
 
 .title-kicker {
@@ -313,6 +315,27 @@ canvas {
   width: min(460px, calc(100% - 44px));
   padding: 16px 18px;
   clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+
+.mobile-dock {
+  position: absolute;
+  right: 18px;
+  bottom: 20px;
+  z-index: 4;
+  display: none;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: min(420px, calc(100% - 40px));
+}
+
+.mobile-dock button {
+  min-width: 96px;
+  padding: 14px 16px;
+  font-size: 13px;
+  background:
+    linear-gradient(180deg, rgba(68, 121, 255, 0.22), rgba(255, 100, 147, 0.16)),
+    rgba(17, 21, 33, 0.96);
 }
 
 .overlay-card h2,
@@ -445,6 +468,33 @@ canvas {
   }
 }
 
+@keyframes title-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes button-breath {
+  0%,
+  100% {
+    box-shadow:
+      0 16px 36px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  50% {
+    box-shadow:
+      0 18px 42px rgba(0, 0, 0, 0.34),
+      0 0 18px rgba(129, 185, 255, 0.12),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+}
+
 @media (max-width: 1120px) {
   .layout {
     grid-template-columns: 1fr;
@@ -453,5 +503,16 @@ canvas {
   .sidebar {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
+@media (pointer: coarse), (max-width: 900px) {
+  .mobile-dock {
+    display: flex;
+  }
+
+  .overlay-card {
+    width: min(520px, calc(100% - 44px));
+    bottom: 96px;
   }
 }

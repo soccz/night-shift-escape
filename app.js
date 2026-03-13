@@ -24,6 +24,9 @@ const controlsList = document.getElementById("controlsList");
 const logHeading = document.getElementById("logHeading");
 const metaHeading = document.getElementById("metaHeading");
 const languageButton = document.getElementById("languageButton");
+const dockModeButton = document.getElementById("dockModeButton");
+const dockInteractButton = document.getElementById("dockInteractButton");
+const dockReinforceButton = document.getElementById("dockReinforceButton");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -44,6 +47,9 @@ const I18N = {
     controlsHeading: "조작",
     logHeading: "이벤트 로그",
     metaHeading: "기록",
+    dock_mode: "이동 전환",
+    dock_interact: "상호작용",
+    dock_reinforce: "문 강화",
     controls: [
       ["이동", "PC: WASD / 모바일: 터치"],
       ["상호작용", "E"],
@@ -99,6 +105,9 @@ const I18N = {
     controlsHeading: "Controls",
     logHeading: "Event Log",
     metaHeading: "Meta",
+    dock_mode: "Move Mode",
+    dock_interact: "Interact",
+    dock_reinforce: "Reinforce",
     controls: [
       ["Move", "PC: WASD / Mobile: Touch"],
       ["Interact", "E"],
@@ -206,6 +215,10 @@ const CONFIG = {
     basePlayerDamage: 12,
     playerDamagePerLevel: 1.6,
   },
+  ally: {
+    interceptDoorRange: 180,
+    defendDoorRange: 220,
+  },
   infected: {
     playerDamage: 8,
     doorDamage: 6,
@@ -262,49 +275,53 @@ let game = createGame();
 const navGraph = buildNavGraph(world);
 
 function buildWorld() {
-  const hall = { id: "hall", x: 120, y: 220, w: 1080, h: 340, label: "Main Hall" };
+  const hall = { id: "hall", x: 150, y: 250, w: 900, h: 240, label: "Central Hall" };
+  const exitConnector = { id: "exitConnector", x: 1050, y: 320, w: 130, h: 100, label: "Exit Corridor" };
+  const generatorConnector = { id: "generatorConnector", x: 980, y: 490, w: 120, h: 110, label: "Service Drop" };
   const rooms = [
-    createRoom("northWest", "North Ward", 80, 60, 280, 160, 190, 214),
-    createRoom("northEast", "Old Infirmary", 940, 60, 280, 160, 1050, 214),
-    createRoom("southWest", "Storage Wing", 80, 560, 280, 160, 190, 560),
-    createRoom("southEast", "Dormitory", 940, 560, 280, 160, 1050, 560),
+    createRoom("northWest", "North Ward", 60, 60, 280, 190, 240, 250),
+    createRoom("northCenter", "Observation", 360, 60, 280, 190, 500, 250),
+    createRoom("northEast", "Old Infirmary", 660, 60, 280, 190, 800, 250),
+    createRoom("southWest", "Storage Wing", 60, 490, 280, 190, 240, 490),
+    createRoom("southCenter", "Dormitory", 360, 490, 280, 190, 500, 490),
+    createRoom("southEast", "Isolation", 660, 490, 280, 190, 800, 490),
   ];
   const generatorRoom = {
     id: "generator",
-    x: 470,
-    y: 560,
-    w: 280,
-    h: 180,
+    x: 920,
+    y: 600,
+    w: 300,
+    h: 120,
     label: "Generator Room",
     door: {
-      x: 590,
-      y: 560,
+      x: 1050,
+      y: 600,
       w: 40,
       h: 10,
-      centerX: 610,
-      centerY: 565,
+      centerX: 1070,
+      centerY: 600,
       closed: false,
     },
   };
   const exitRoom = {
     id: "exit",
-    x: 1200,
-    y: 320,
+    x: 1180,
+    y: 300,
     w: 140,
     h: 140,
     label: "Service Gate",
     gate: {
-      x: 1190,
-      y: 370,
+      x: 1180,
+      y: 350,
       w: 10,
       h: 40,
-      centerX: 1195,
-      centerY: 390,
+      centerX: 1185,
+      centerY: 370,
       closed: true,
     },
   };
 
-  const zones = [hall, generatorRoom, exitRoom, ...rooms];
+  const zones = [hall, exitConnector, generatorConnector, generatorRoom, exitRoom, ...rooms];
   const barriers = [];
 
   for (const room of rooms) {
@@ -339,15 +356,17 @@ function buildWorld() {
 
   return {
     hall,
+    exitConnector,
+    generatorConnector,
     rooms,
     generatorRoom,
     exitRoom,
     zones,
     barriers,
-    generator: { x: 610, y: 655, radius: 28 },
+    generator: { x: 1070, y: 658, radius: 28 },
     keycards: [
-      { id: "sigilWest", x: 610, y: 690, roomId: "generator", threshold: 2, collected: false, visible: false },
-      { id: "sigilEast", x: 1140, y: 390, roomId: "hall", threshold: 4, collected: false, visible: false },
+      { id: "sigilWest", x: 1070, y: 690, roomId: "generator", threshold: 2, collected: false, visible: false },
+      { id: "sigilEast", x: 880, y: 585, roomId: "southEast", threshold: 4, collected: false, visible: false },
     ],
   };
 }
@@ -416,8 +435,8 @@ function createGame() {
   world.exitRoom.gate.closed = true;
 
   const player = {
-    x: 660,
-    y: 390,
+    x: 590,
+    y: 370,
     radius: 12,
     hp: CONFIG.player.maxHp,
     maxHp: CONFIG.player.maxHp,
@@ -430,22 +449,25 @@ function createGame() {
   };
 
   const hunter = {
-    x: 660,
-    y: 285,
+    x: 590,
+    y: 310,
     radius: 16,
     hp: CONFIG.hunter.baseHp + CONFIG.hunter.hpPerLevel,
     targetRoomId: null,
-    targetX: 660,
-    targetY: 390,
+    targetX: 590,
+    targetY: 370,
     speed: 72,
     attackCooldown: 0,
     retargetTimer: 0,
     level: 1,
+    mode: "stalk",
+    modeTimer: 0,
   };
 
   const assigned = new Map([
     ["northWest", "hiderA"],
     ["northEast", "hiderB"],
+    ["southEast", "hiderC"],
   ]);
 
   const hiders = [];
@@ -541,6 +563,9 @@ function applyStaticText() {
   controlsHeading.textContent = t("controlsHeading");
   logHeading.textContent = t("logHeading");
   metaHeading.textContent = t("metaHeading");
+  dockModeButton.textContent = t("dock_mode");
+  dockInteractButton.textContent = t("dock_interact");
+  dockReinforceButton.textContent = t("dock_reinforce");
   languageButton.textContent = state.lang === "ko" ? "EN" : "KO";
   controlsList.innerHTML = I18N[state.lang].controls
     .map(([label, value]) => `<li><span>${label}</span><strong>${value}</strong></li>`)
@@ -550,6 +575,25 @@ function applyStaticText() {
 restartButton.addEventListener("click", resetGame);
 startButton.addEventListener("click", startRun);
 languageButton.addEventListener("click", toggleLanguage);
+dockModeButton.addEventListener("click", () => {
+  state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
+  state.clickTarget = null;
+  pushLog(state.lang === "ko" ? `이동 방식: ${t(`movement_${state.movementMode}`)}` : `Movement mode: ${state.movementMode.toUpperCase()}`);
+});
+dockInteractButton.addEventListener("click", () => {
+  ensureAudio();
+  if (state.titleVisible) {
+    startRun();
+  }
+  triggerInteract();
+});
+dockReinforceButton.addEventListener("click", () => {
+  ensureAudio();
+  if (state.titleVisible) {
+    startRun();
+  }
+  attemptReinforce();
+});
 
 window.addEventListener("keydown", (event) => {
   ensureAudio();
@@ -814,12 +858,15 @@ function performSummon(room) {
   const unit = {
     id: `unit-${state.nextUnitId++}`,
     type,
+    role: type === "sentinel" ? "anchor" : type === "rover" ? "interceptor" : type === "relic" ? "ward" : "volatile",
     roomId: room.id,
     x: freeSpot.x,
     y: freeSpot.y,
     cooldown: randomRange(0.1, 0.7),
     life: type === "husk" ? 9 : 999,
     angle: randomRange(0, Math.PI * 2),
+    homeX: freeSpot.x,
+    homeY: freeSpot.y,
   };
 
   game.units.push(unit);
@@ -1138,6 +1185,7 @@ function updateMutation(dt) {
 }
 
 function updateUnits(dt) {
+  const ownedRoom = getOwnedRoom();
   for (let i = game.units.length - 1; i >= 0; i -= 1) {
     const unit = game.units[i];
     unit.cooldown -= dt;
@@ -1155,12 +1203,8 @@ function updateUnits(dt) {
       continue;
     }
 
-    if (unit.type === "rover") {
-      unit.angle += dt * 1.8;
-      const room = world.rooms.find((entry) => entry.id === unit.roomId);
-      unit.x = room.x + room.w / 2 + Math.cos(unit.angle) * 72;
-      unit.y = room.y + room.h / 2 + Math.sin(unit.angle) * 44;
-    }
+    const localTarget = selectUnitTarget(unit, ownedRoom);
+    updateUnitPosition(unit, localTarget, dt);
 
     if (game.blackoutActive) {
       continue;
@@ -1170,13 +1214,16 @@ function updateUnits(dt) {
       continue;
     }
 
-    const targetRange = unit.type === "relic" ? 260 : 180;
-    const target = nearestEnemy(unit, targetRange);
+    const targetRange = unit.type === "relic" ? 260 : unit.type === "rover" ? 200 : 185;
+    const target = localTarget || nearestEnemy(unit, targetRange);
     if (!target) {
       continue;
     }
 
-    const damage = unit.type === "relic" ? 24 : unit.type === "rover" ? 13 : 10;
+    const targetNearDoor =
+      ownedRoom &&
+      distance(target, { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY }) < CONFIG.ally.defendDoorRange;
+    const damage = unit.type === "relic" ? 24 : unit.type === "rover" ? 13 : targetNearDoor ? 14 : 10;
     target.hp -= damage;
     spawnImpact(target.x, target.y, unit.type === "relic" ? "violet" : "cyan", unit.type === "relic" ? 1.35 : 0.85, 10);
     spawnTracer(unit.x, unit.y, target.x, target.y, unit.type === "relic" ? "violet" : "cyan");
@@ -1187,15 +1234,18 @@ function updateUnits(dt) {
           spawnImpact(extra.x, extra.y, "violet", 0.8, 8);
         }
       }
+      if (game.hunter && distance(unit, game.hunter) < 150) {
+        game.hunter.speed = Math.max(CONFIG.hunter.baseSpeed, game.hunter.speed - 12);
+      }
     }
-    unit.cooldown = unit.type === "relic" ? 1.15 : unit.type === "rover" ? 0.55 : 0.8;
+    unit.cooldown = unit.type === "relic" ? 1.15 : unit.type === "rover" ? 0.42 : targetNearDoor ? 0.56 : 0.8;
   }
 
   game.infected = game.infected.filter((enemy) => enemy.hp > 0);
   if (game.hunter.hp <= 0) {
     game.hunter.hp = hunterMaxHp();
-    game.hunter.x = 660;
-    game.hunter.y = 285;
+    game.hunter.x = 590;
+    game.hunter.y = 310;
     pushLog("The hunter reformed in the hall.");
     pulseShake(1.8);
     playUiTone(110, 0.28, "triangle", 0.035);
@@ -1205,10 +1255,13 @@ function updateUnits(dt) {
 function updateHunter(dt) {
   const hunter = game.hunter;
   hunter.level = 1 + Math.floor(game.time / 55) + Math.floor(game.fragments / 2) + countBreaches();
+  updateHunterMode(dt);
+  const modeModifiers = hunterModeProfile();
   hunter.speed =
-    CONFIG.hunter.baseSpeed +
-    hunter.level * CONFIG.hunter.speedPerLevel +
-    (game.blackoutActive ? CONFIG.hunter.blackoutSpeedBonus : 0);
+    (CONFIG.hunter.baseSpeed +
+      hunter.level * CONFIG.hunter.speedPerLevel +
+      (game.blackoutActive ? CONFIG.hunter.blackoutSpeedBonus : 0)) *
+    modeModifiers.speed;
   hunter.attackCooldown = Math.max(0, hunter.attackCooldown - dt);
   hunter.retargetTimer -= dt;
 
@@ -1224,6 +1277,55 @@ function updateHunter(dt) {
 
 function hunterMaxHp() {
   return CONFIG.hunter.baseHp + game.hunter.level * CONFIG.hunter.hpPerLevel;
+}
+
+function updateHunterMode(dt) {
+  const hunter = game.hunter;
+  hunter.modeTimer -= dt;
+  if (hunter.modeTimer > 0) {
+    return;
+  }
+
+  const ownedRoom = getOwnedRoom();
+  let nextMode = "stalk";
+  if (game.blackoutActive) {
+    nextMode = "rush";
+  }
+  if (ownedRoom) {
+    const doorHealthRatio = ownedRoom.door.maxHp > 0 ? ownedRoom.door.hp / ownedRoom.door.maxHp : 0;
+    const defenders = game.units.filter((unit) => unit.roomId === ownedRoom.id && unit.type !== "husk").length;
+    if (ownedRoom.breach || game.player.hp < 38) {
+      nextMode = "enrage";
+    } else if (ownedRoom.door.closed && !ownedRoom.door.broken && doorHealthRatio < 0.5) {
+      nextMode = "siege";
+    } else if (defenders >= 3) {
+      nextMode = "rush";
+    }
+  }
+
+  if (hunter.mode !== nextMode) {
+    hunter.mode = nextMode;
+    const labels = {
+      stalk: "The hunter goes quiet.",
+      siege: "The hunter braces to break the door.",
+      rush: "The hunter surges through the hall.",
+      enrage: "The hunter is enraged.",
+    };
+    pushLog(labels[nextMode]);
+    if (nextMode === "enrage") {
+      showBanner(state.lang === "ko" ? "광폭화" : "Enrage", state.lang === "ko" ? "술래가 속도를 올립니다." : "The hunter accelerates.", "crimson", 1.2);
+    }
+  }
+  hunter.modeTimer = 4.5;
+}
+
+function hunterModeProfile() {
+  return {
+    stalk: { speed: 0.96, damage: 1, cooldown: 1 },
+    siege: { speed: 0.88, damage: 1.35, cooldown: 0.8 },
+    rush: { speed: 1.28, damage: 1.12, cooldown: 0.78 },
+    enrage: { speed: 1.42, damage: 1.42, cooldown: 0.62 },
+  }[game.hunter.mode];
 }
 
 function retargetHunter() {
@@ -1312,8 +1414,9 @@ function handleHunterDoorDamage() {
   if (game.hunter.attackCooldown > 0) {
     return;
   }
-  game.hunter.attackCooldown = 0.7;
-  const damage = CONFIG.hunter.baseDoorDamage + game.hunter.level * CONFIG.hunter.damagePerLevel;
+  const mode = hunterModeProfile();
+  game.hunter.attackCooldown = 0.7 * mode.cooldown;
+  const damage = (CONFIG.hunter.baseDoorDamage + game.hunter.level * CONFIG.hunter.damagePerLevel) * mode.damage;
   room.door.hp -= damage;
   spawnImpact(room.door.centerX, room.door.centerY, "crimson", 1.05, 12);
   if (room.door.thorns) {
@@ -1337,8 +1440,9 @@ function handleHunterAttacks() {
 
   if (room.owner === "player") {
     if (distance(game.hunter, game.player) < 24 && game.hunter.attackCooldown <= 0) {
-      game.hunter.attackCooldown = 0.65;
-      game.player.hp -= CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel;
+      const mode = hunterModeProfile();
+      game.hunter.attackCooldown = 0.65 * mode.cooldown;
+      game.player.hp -= (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) * mode.damage;
       game.player.lastDamageSource = "hunter";
       pulseShake(1.25);
       playUiTone(150, 0.08, "square", 0.04);
@@ -1482,6 +1586,81 @@ function nearestEnemy(unit, range) {
   return chosen;
 }
 
+function selectUnitTarget(unit, ownedRoom) {
+  if (!ownedRoom || unit.roomId !== ownedRoom.id) {
+    return nearestEnemy(unit, unit.type === "relic" ? 260 : 180);
+  }
+
+  const doorPoint = { x: ownedRoom.door.centerX, y: ownedRoom.door.centerY };
+  if (unit.role === "anchor") {
+    return nearestEnemyWithFilter(unit, CONFIG.ally.defendDoorRange, (enemy) => distance(enemy, doorPoint) < 110);
+  }
+  if (unit.role === "interceptor") {
+    return nearestEnemyWithFilter(unit, 240, (enemy) => distance(enemy, doorPoint) < CONFIG.ally.interceptDoorRange || pointInRect(enemy.x, enemy.y, ownedRoom));
+  }
+  if (unit.role === "ward") {
+    return nearestEnemy(unit, 260);
+  }
+  return nearestEnemy(unit, 180);
+}
+
+function updateUnitPosition(unit, target, dt) {
+  const room = world.rooms.find((entry) => entry.id === unit.roomId);
+  if (!room) {
+    return;
+  }
+
+  if (unit.role === "interceptor") {
+    const interceptPoint = target
+      ? { x: clamp(target.x, room.x + 20, room.x + room.w - 20), y: clamp(target.y, room.y + 20, room.y + room.h - 20) }
+      : { x: room.door.centerX, y: room.y + room.h / 2 };
+    const speed = 88;
+    const dx = interceptPoint.x - unit.x;
+    const dy = interceptPoint.y - unit.y;
+    const len = Math.hypot(dx, dy);
+    if (len > 2) {
+      unit.x += (dx / len) * speed * dt;
+      unit.y += (dy / len) * speed * dt;
+    }
+    return;
+  }
+
+  if (unit.role === "anchor") {
+    const anchorPoint = { x: room.door.centerX - 42, y: room.y + room.h / 2 };
+    unit.x += (anchorPoint.x - unit.x) * Math.min(1, dt * 2.2);
+    unit.y += (anchorPoint.y - unit.y) * Math.min(1, dt * 2.2);
+    return;
+  }
+
+  if (unit.role === "ward") {
+    const wardPoint = { x: room.altar.x, y: room.altar.y };
+    unit.x += (wardPoint.x - unit.x) * Math.min(1, dt * 1.6);
+    unit.y += (wardPoint.y - unit.y) * Math.min(1, dt * 1.6);
+    return;
+  }
+
+  unit.angle += dt * 1.8;
+  unit.x = room.x + room.w / 2 + Math.cos(unit.angle) * 72;
+  unit.y = room.y + room.h / 2 + Math.sin(unit.angle) * 44;
+}
+
+function nearestEnemyWithFilter(unit, range, predicate) {
+  const candidates = [game.hunter, ...game.infected];
+  let chosen = null;
+  let bestDistance = range;
+  for (const enemy of candidates) {
+    if (!predicate(enemy)) {
+      continue;
+    }
+    const d = distance(unit, enemy);
+    if (d < bestDistance) {
+      bestDistance = d;
+      chosen = enemy;
+    }
+  }
+  return chosen;
+}
+
 function countBreaches() {
   return world.rooms.filter((room) => room.breach).length;
 }
@@ -1517,28 +1696,39 @@ function buildNavGraph(currentWorld) {
     }
   };
 
+  pushNode("hallLeft", currentWorld.hall.x + 150, currentWorld.hall.y + currentWorld.hall.h / 2);
   pushNode("hallCenter", currentWorld.hall.x + currentWorld.hall.w / 2, currentWorld.hall.y + currentWorld.hall.h / 2);
-  pushNode("northWestDoor", 190, 246);
-  pushNode("northEastDoor", 1050, 246);
-  pushNode("southWestDoor", 190, 534);
-  pushNode("southEastDoor", 1050, 534);
-  pushNode("generatorDoor", 610, 534);
-  pushNode("exitDoor", 1160, 390);
-  pushNode("northWestRoom", 220, 140);
-  pushNode("northEastRoom", 1080, 140);
-  pushNode("southWestRoom", 220, 640);
-  pushNode("southEastRoom", 1080, 640);
-  pushNode("generatorRoom", 610, 650);
-  pushNode("exitRoom", 1260, 390);
+  pushNode("hallRight", currentWorld.hall.x + currentWorld.hall.w - 120, currentWorld.hall.y + currentWorld.hall.h / 2);
+  pushNode("exitConnector", currentWorld.exitConnector.x + currentWorld.exitConnector.w / 2, currentWorld.exitConnector.y + currentWorld.exitConnector.h / 2);
+  pushNode("generatorConnector", currentWorld.generatorConnector.x + currentWorld.generatorConnector.w / 2, currentWorld.generatorConnector.y + currentWorld.generatorConnector.h / 2);
 
-  for (const nodeId of ["northWestDoor", "northEastDoor", "southWestDoor", "southEastDoor", "generatorDoor", "exitDoor"]) {
-    link("hallCenter", nodeId);
+  link("hallLeft", "hallCenter");
+  link("hallCenter", "hallRight");
+  link("hallRight", "exitConnector");
+  link("hallRight", "generatorConnector");
+
+  for (const room of currentWorld.rooms) {
+    const doorId = `${room.id}Door`;
+    const roomId = `${room.id}Room`;
+    pushNode(doorId, room.door.centerX, room.door.centerY + (room.y < currentWorld.hall.y ? 28 : -28));
+    pushNode(roomId, room.x + room.w / 2, room.y + room.h / 2);
+    const hub = room.door.centerX < currentWorld.hall.x + currentWorld.hall.w / 3
+      ? "hallLeft"
+      : room.door.centerX < currentWorld.hall.x + (currentWorld.hall.w * 2) / 3
+        ? "hallCenter"
+        : "hallRight";
+    link(hub, doorId);
+    link(doorId, roomId);
   }
-  link("northWestDoor", "northWestRoom");
-  link("northEastDoor", "northEastRoom");
-  link("southWestDoor", "southWestRoom");
-  link("southEastDoor", "southEastRoom");
+
+  pushNode("generatorDoor", currentWorld.generatorRoom.door.centerX, currentWorld.generatorRoom.door.centerY - 30);
+  pushNode("generatorRoom", currentWorld.generatorRoom.x + currentWorld.generatorRoom.w / 2, currentWorld.generatorRoom.y + currentWorld.generatorRoom.h / 2);
+  pushNode("exitDoor", currentWorld.exitRoom.gate.centerX + 34, currentWorld.exitRoom.gate.centerY);
+  pushNode("exitRoom", currentWorld.exitRoom.x + currentWorld.exitRoom.w / 2, currentWorld.exitRoom.y + currentWorld.exitRoom.h / 2);
+
+  link("generatorConnector", "generatorDoor");
   link("generatorDoor", "generatorRoom");
+  link("exitConnector", "exitDoor");
   link("exitDoor", "exitRoom");
 
   return nodes;
@@ -1630,6 +1820,7 @@ function draw() {
   const shakeX = (Math.random() - 0.5) * state.screenShake * 10;
   const shakeY = (Math.random() - 0.5) * state.screenShake * 10;
   ctx.translate(shakeX, shakeY);
+  drawAtmosphere();
   drawZones();
   drawThreatOverlay();
   drawKeycards();
@@ -1682,6 +1873,35 @@ function drawBackdrop() {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   drawSpeedLines(dangerLevel() * 0.22);
+}
+
+function drawAtmosphere() {
+  const time = game.time;
+  const danger = dangerLevel();
+
+  ctx.save();
+  for (let i = 0; i < 4; i += 1) {
+    const y = 110 + i * 170 + Math.sin(time * 0.22 + i) * 18;
+    const x = ((time * (18 + i * 6)) % (WIDTH + 340)) - 220;
+    const fog = ctx.createLinearGradient(x, y, x + 260, y + 40);
+    fog.addColorStop(0, "rgba(130, 176, 255, 0)");
+    fog.addColorStop(0.5, `rgba(130, 176, 255, ${0.035 + danger * 0.03})`);
+    fog.addColorStop(1, "rgba(130, 176, 255, 0)");
+    ctx.fillStyle = fog;
+    ctx.fillRect(x, y, 320, 54);
+  }
+
+  for (let i = 0; i < 24; i += 1) {
+    const seed = i * 37.17;
+    const px = ((time * (12 + (i % 5) * 4) + seed * 19) % (WIDTH + 80)) - 40;
+    const py = 40 + ((seed * 53 + time * (6 + (i % 3))) % (HEIGHT - 80));
+    const radius = 1.2 + (i % 3) * 0.7;
+    ctx.beginPath();
+    ctx.arc(px, py, radius, 0, Math.PI * 2);
+    ctx.fillStyle = i % 4 === 0 ? "rgba(255, 143, 182, 0.22)" : "rgba(173, 221, 255, 0.18)";
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 function drawZones() {
@@ -1743,7 +1963,18 @@ function drawKeycards() {
 function drawUnits() {
   for (const unit of game.units) {
     const color = colors[unit.type];
-    drawCelOrb(unit.x, unit.y, unit.type === "relic" ? 13 : 11, color, "#ffffff", unit.type === "relic" ? 0.22 : 0.1);
+    const bob = Math.sin(game.time * 2.8 + unit.x * 0.02 + unit.y * 0.01) * 3;
+    const radius = unit.type === "relic" ? 13 : 11;
+    drawShadow(unit.x, unit.y + 12, radius + 6, 0.18);
+    drawCelOrb(unit.x, unit.y + bob, radius, color, "#ffffff", unit.type === "relic" ? 0.28 : 0.14);
+    if (unit.role === "anchor") {
+      drawPulseRing(unit.x, unit.y + bob, radius + 10, "rgba(133, 216, 255, 0.18)");
+    } else if (unit.role === "interceptor") {
+      drawPulseRing(unit.x, unit.y + bob, radius + 8 + Math.sin(game.time * 6 + unit.x) * 2, "rgba(185, 239, 170, 0.18)");
+    }
+    if (unit.type === "relic") {
+      drawPulseRing(unit.x, unit.y + bob, 18 + Math.sin(game.time * 3.6 + unit.x) * 2, "rgba(212, 149, 255, 0.28)");
+    }
   }
 }
 
@@ -1765,6 +1996,10 @@ function drawActors() {
 
 function drawDoors() {
   for (const room of world.rooms) {
+    const hpPct = clamp(room.door.hp / room.door.maxHp, 0, 1);
+    const shake = room.door.closed && hpPct < 0.45 ? Math.sin(game.time * 22 + room.door.centerX) * (1 - hpPct) * 2.5 : 0;
+    ctx.save();
+    ctx.translate(shake, 0);
     ctx.fillStyle = room.door.closed && !room.door.broken ? colors.door : colors.doorOpen;
     ctx.fillRect(room.door.x, room.door.y, room.door.w, room.door.h);
     if (room.door.closed && !room.door.broken) {
@@ -1774,12 +2009,12 @@ function drawDoors() {
       }
     }
     if (room.owner) {
-      const hpPct = clamp(room.door.hp / room.door.maxHp, 0, 1);
       ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
       ctx.fillRect(room.door.x, room.door.y - 10, room.door.w, 4);
       ctx.fillStyle = room.door.curse ? "#ff77a8" : "#8fe9c7";
       ctx.fillRect(room.door.x, room.door.y - 10, room.door.w * hpPct, 4);
     }
+    ctx.restore();
   }
 
   ctx.fillStyle = world.exitRoom.gate.closed ? "#634646" : "#3d6e63";
@@ -1789,18 +2024,20 @@ function drawDoors() {
 function drawLighting() {
   ctx.save();
   const danger = dangerLevel();
+  const flicker = game.blackoutActive ? 0.06 + Math.sin(game.time * 17) * 0.03 : Math.sin(game.time * 4.2) * 0.012;
   ctx.fillStyle = game.blackoutActive
-    ? `rgba(3, 4, 10, ${0.8 + danger * 0.08})`
-    : `rgba(2, 4, 9, ${0.68 + danger * 0.06})`;
+    ? `rgba(3, 4, 10, ${0.82 + danger * 0.08 + flicker})`
+    : `rgba(2, 4, 9, ${0.68 + danger * 0.06 + flicker})`;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.globalCompositeOperation = "destination-out";
 
-  const playerLight = ctx.createRadialGradient(game.player.x, game.player.y, 24, game.player.x, game.player.y, 170);
+  const playerLightRadius = 168 + Math.sin(game.time * 5.4) * 6;
+  const playerLight = ctx.createRadialGradient(game.player.x, game.player.y, 24, game.player.x, game.player.y, playerLightRadius);
   playerLight.addColorStop(0, "rgba(0, 0, 0, 0.92)");
   playerLight.addColorStop(1, "rgba(0, 0, 0, 0)");
   ctx.fillStyle = playerLight;
   ctx.beginPath();
-  ctx.arc(game.player.x, game.player.y, 170, 0, Math.PI * 2);
+  ctx.arc(game.player.x, game.player.y, playerLightRadius, 0, Math.PI * 2);
   ctx.fill();
 
   if (!game.blackoutActive) {
@@ -1812,7 +2049,7 @@ function drawLighting() {
         50,
         ownedRoom.x + ownedRoom.w / 2,
         ownedRoom.y + ownedRoom.h / 2,
-        150,
+        150 + Math.sin(game.time * 2.5) * 5,
       );
       roomLight.addColorStop(0, "rgba(0, 0, 0, 0.4)");
       roomLight.addColorStop(1, "rgba(0, 0, 0, 0)");
@@ -1979,23 +2216,39 @@ function drawCharacter(entity, kind) {
   }[kind];
 
   const radius = entity.radius || (kind === "hider" ? 11 : 10);
-  drawCelOrb(entity.x, entity.y, radius, palette.fill, palette.rim, palette.glow);
+  const phaseSeed = (entity.x + entity.y + radius * 13) * 0.01;
+  const bob = Math.sin(game.time * (kind === "hunter" ? 4.4 : 5.2) + phaseSeed) * (kind === "hunter" ? 2.6 : 2.2);
+  const breath = 1 + Math.sin(game.time * (kind === "hunter" ? 2.6 : 3.4) + phaseSeed) * 0.045;
+  const drawX = entity.x;
+  const drawY = entity.y + bob;
+
+  drawShadow(drawX, drawY + radius + 8, radius + (kind === "hunter" ? 10 : 6), kind === "hunter" ? 0.26 : 0.18);
+
+  ctx.save();
+  ctx.translate(drawX, drawY);
+  ctx.scale(breath, 1 / breath);
+  drawCelOrb(0, 0, radius, palette.fill, palette.rim, palette.glow);
+  ctx.restore();
 
   if (kind === "player") {
     ctx.save();
     ctx.strokeStyle = "rgba(133, 216, 255, 0.95)";
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 3.2;
     ctx.beginPath();
-    ctx.arc(entity.x, entity.y, radius + 9, 0, Math.PI * 2);
+    ctx.arc(drawX, drawY, radius + 9 + Math.sin(game.time * 3.8) * 1.4, 0, Math.PI * 2);
     ctx.stroke();
+    drawPulseRing(drawX, drawY, radius + 15 + Math.sin(game.time * 4.8) * 2, "rgba(133, 216, 255, 0.18)");
     ctx.fillStyle = "#f5fbff";
     ctx.font = "700 12px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-    ctx.fillText(t("player_tag"), entity.x - 10, entity.y - radius - 14);
+    ctx.fillText(t("player_tag"), drawX - 10, drawY - radius - 14);
     ctx.restore();
+  } else if (kind === "hunter") {
+    drawPulseRing(drawX, drawY, radius + 18 + Math.sin(game.time * 6.4) * 3, "rgba(255, 92, 132, 0.16)");
   }
 
   ctx.save();
-  ctx.translate(entity.x, entity.y);
+  ctx.translate(drawX, drawY);
+  ctx.scale(breath, 1 / breath);
   ctx.strokeStyle = "rgba(18, 18, 28, 0.95)";
   ctx.lineWidth = 2.5;
   ctx.fillStyle = palette.accent;
@@ -2043,6 +2296,26 @@ function drawCharacter(entity, kind) {
   ctx.restore();
 }
 
+function drawShadow(x, y, radius, alpha) {
+  const shadow = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius);
+  shadow.addColorStop(0, `rgba(0, 0, 0, ${alpha})`);
+  shadow.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.ellipse(x, y, radius, radius * 0.42, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function drawPulseRing(x, y, radius, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawThreatOverlay() {
   const danger = dangerLevel();
   if (danger < 0.12) {
@@ -2050,8 +2323,9 @@ function drawThreatOverlay() {
   }
 
   const alpha = clamp(danger * 0.55, 0, 0.55);
+  const pulse = 1 + Math.sin(game.time * 8) * 0.08;
   ctx.fillStyle = `rgba(255, 62, 116, ${alpha})`;
-  ctx.fillRect(24, HEIGHT - 70, 240, 28);
+  ctx.fillRect(24, HEIGHT - 72, 240 * pulse, 28);
   ctx.fillStyle = "#fff3f8";
   ctx.font = "700 16px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
   ctx.fillText(game.blackoutActive ? "BLACKOUT ALERT" : "THREAT RISING", 38, HEIGHT - 50);
