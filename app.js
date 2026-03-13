@@ -670,6 +670,18 @@ const state = {
     x: 0,
     y: 0,
   },
+  runtime: {
+    ownedRoom: null,
+    prompt: null,
+    danger: 0,
+    incomeText: "",
+  },
+  perf: {
+    avgDt: 1 / 60,
+    slowFrames: 0,
+    ambientTick: 0,
+    autoLowFx: false,
+  },
   hudCache: {
     lastRenderAt: 0,
     stats: "",
@@ -1324,6 +1336,7 @@ function resetGame() {
   state.outcomeText = "";
   game = createGame();
   updateCamera();
+  refreshRuntimeState();
   pushLog(langText("런을 초기화했습니다. 방을 점거하고 탈출까지 버텨보세요.", "Run reset. Claim a room and survive long enough to escape."));
   announceRunSetup();
   renderHud(true);
@@ -2185,6 +2198,7 @@ function update(dt) {
     updateEffects(dt);
     updateBanner(dt);
     updateFlash(dt);
+    refreshRuntimeState();
     return;
   }
 
@@ -2192,6 +2206,7 @@ function update(dt) {
     updateEffects(dt * 0.25);
     updateBanner(dt * 0.25);
     updateFlash(dt * 0.25);
+    refreshRuntimeState();
     return;
   }
 
@@ -2200,6 +2215,7 @@ function update(dt) {
     updateEffects(dt);
     updateBanner(dt);
     updateFlash(dt);
+    refreshRuntimeState();
     return;
   }
 
@@ -2228,6 +2244,7 @@ function update(dt) {
   updateInfected(dt);
   collectKeycards();
   updateContracts(dt);
+  refreshRuntimeState();
 
   if (game.player.hp <= 0) {
     failRun(
@@ -2236,6 +2253,14 @@ function update(dt) {
         : langText("술래에게 붙잡혔습니다.", "You were taken by the hunter."),
     );
   }
+}
+
+function refreshRuntimeState() {
+  const ownedRoom = getOwnedRoom();
+  state.runtime.ownedRoom = ownedRoom;
+  state.runtime.prompt = getPrompt();
+  state.runtime.danger = dangerLevel();
+  state.runtime.incomeText = formatIncomeStatus(ownedRoom);
 }
 
 function updatePlayer(dt) {
@@ -3626,8 +3651,8 @@ function drawBackdrop() {
   ctx.fillStyle = blueBloom;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  if (!state.lowFx && dangerLevel() > 0.18) {
-    drawSpeedLines(dangerLevel() * 0.14);
+  if (!state.lowFx && state.runtime.danger > 0.18) {
+    drawSpeedLines(state.runtime.danger * 0.14);
   }
 }
 
@@ -3636,7 +3661,7 @@ function drawAtmosphere() {
     return;
   }
   const time = game.time;
-  const danger = dangerLevel();
+  const danger = state.runtime.danger;
 
   ctx.save();
   for (let i = 0; i < 2; i += 1) {
@@ -3664,9 +3689,9 @@ function drawAtmosphere() {
 }
 
 function drawZones() {
-  const ownedRoom = getOwnedRoom();
+  const ownedRoom = state.runtime.ownedRoom;
   const localOwnedRoom = ownedRoom && ownedRoom.floor === game.player.floor ? ownedRoom : null;
-  const nearbyPrompt = getPrompt();
+  const nearbyPrompt = state.runtime.prompt;
 
   for (const zone of world.zones) {
     if (zone.floor !== game.player.floor) {
@@ -4042,8 +4067,21 @@ function drawDoors() {
 }
 
 function drawLighting() {
+  const danger = state.runtime.danger;
+  if (state.lowFx) {
+    ctx.save();
+    const alpha = game.blackoutActive ? 0.78 : 0.62 + danger * 0.08;
+    ctx.fillStyle = `rgba(3, 5, 11, ${alpha})`;
+    ctx.fillRect(0, 0, WIDTH, HEIGHT);
+    ctx.globalCompositeOperation = "destination-out";
+    const screenPlayer = worldToScreen(game.player);
+    ctx.beginPath();
+    ctx.arc(screenPlayer.x, screenPlayer.y, 150, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   ctx.save();
-  const danger = dangerLevel();
   const flicker = game.blackoutActive ? 0.06 + Math.sin(game.time * 17) * 0.03 : Math.sin(game.time * 4.2) * 0.012;
   ctx.fillStyle = game.blackoutActive
     ? `rgba(3, 4, 10, ${0.82 + danger * 0.08 + flicker})`
@@ -4062,7 +4100,7 @@ function drawLighting() {
   ctx.fill();
 
   if (!game.blackoutActive) {
-    const ownedRoom = getOwnedRoom();
+    const ownedRoom = state.runtime.ownedRoom;
     if (ownedRoom && ownedRoom.floor === game.player.floor) {
       const roomCenter = worldToScreen({ x: ownedRoom.x + ownedRoom.w / 2, y: ownedRoom.y + ownedRoom.h / 2 });
       const roomLight = ctx.createRadialGradient(
@@ -4409,7 +4447,7 @@ function drawPulseRing(x, y, radius, color) {
 }
 
 function drawThreatOverlay() {
-  const danger = dangerLevel();
+  const danger = state.runtime.danger;
   if (
     danger < 0.12 &&
     game.suppressionTime <= 0 &&
@@ -4588,6 +4626,9 @@ function spawnImpact(x, y, color, size, spikes) {
   if (state.lowFx) {
     return;
   }
+  if (state.effects.length > 80) {
+    state.effects.splice(0, state.effects.length - 80);
+  }
   state.effects.push({
     kind: "impact",
     x,
@@ -4603,6 +4644,9 @@ function spawnImpact(x, y, color, size, spikes) {
 function spawnSlash(x1, y1, x2, y2, color) {
   if (state.lowFx) {
     return;
+  }
+  if (state.effects.length > 80) {
+    state.effects.splice(0, state.effects.length - 80);
   }
   state.effects.push({
     kind: "slash",
@@ -4621,6 +4665,9 @@ function spawnSlash(x1, y1, x2, y2, color) {
 function spawnTracer(x1, y1, x2, y2, color) {
   if (state.lowFx) {
     return;
+  }
+  if (state.effects.length > 80) {
+    state.effects.splice(0, state.effects.length - 80);
   }
   state.effects.push({
     kind: "tracer",
@@ -4649,7 +4696,7 @@ function drawAfterimages() {
   if (state.lowFx) {
     return;
   }
-  const danger = dangerLevel();
+  const danger = state.runtime.danger;
   if (danger < 0.08) {
     return;
   }
@@ -4761,7 +4808,7 @@ function renderHud(force = false) {
     return;
   }
   state.hudCache.lastRenderAt = now;
-  const ownedRoom = getOwnedRoom();
+  const ownedRoom = state.runtime.ownedRoom;
   const primaryStats = [
     [t("stat_health"), `${Math.ceil(game.player.hp)}`, game.player.hp < 30 ? "danger" : ""],
     [t("stat_gold"), `${Math.floor(game.gold)}`, "gold"],
@@ -4818,12 +4865,14 @@ function renderHud(force = false) {
     [t("meta_unlock"), getUnlockSummary(state.meta)],
   ];
 
-  const metaHtml = metaRows
-    .map(([label, value]) => `<div class="stat-row"><span>${label}</span><strong>${value}</strong></div>`)
-    .join("") + renderMetaTree();
-  if (metaHtml !== state.hudCache.meta) {
-    state.hudCache.meta = metaHtml;
-    metaEl.innerHTML = metaHtml;
+  if (!state.sidebarCollapsed) {
+    const metaHtml = metaRows
+      .map(([label, value]) => `<div class="stat-row"><span>${label}</span><strong>${value}</strong></div>`)
+      .join("") + renderMetaTree();
+    if (metaHtml !== state.hudCache.meta) {
+      state.hudCache.meta = metaHtml;
+      metaEl.innerHTML = metaHtml;
+    }
   }
 
   const ownedObjective = !ownedRoom
@@ -4847,8 +4896,8 @@ function renderHud(force = false) {
     objectiveEl.innerHTML = objectiveHtml;
   }
 
-  const prompt = getPrompt();
-  const incomeText = formatIncomeStatus(ownedRoom);
+  const prompt = state.runtime.prompt;
+  const incomeText = state.runtime.incomeText;
   const promptHtml = `
     <span class="prompt-kicker">${langText("지금 할 행동", "Next Action")}</span>
     <strong class="prompt-main">${prompt ? prompt.text : t("prompt_none")}</strong>
@@ -4907,6 +4956,9 @@ function renderHud(force = false) {
 
 function pushLog(text) {
   state.logs.push({ time: formatTime(game.time), text });
+  if (state.logs.length > 48) {
+    state.logs.splice(0, state.logs.length - 48);
+  }
   renderHud(true);
 }
 
@@ -5166,9 +5218,13 @@ function updateAmbientAudio() {
   if (!state.audio.unlocked || !state.audio.context || !state.audio.ambient) {
     return;
   }
+  if (state.perf.ambientTick > 0) {
+    return;
+  }
+  state.perf.ambientTick = state.lowFx ? 0.28 : 0.16;
   const { context, ambient } = state.audio;
   const now = context.currentTime;
-  const danger = dangerLevel();
+  const danger = state.runtime.danger;
   const pausedFactor = state.paused || state.titleVisible ? 0.25 : 1;
   const suppressionFactor =
     (game.suppressionTime > 0 ? 0.18 : 0) +
@@ -5221,6 +5277,22 @@ function saveMutePreference(muted) {
 function loop(now) {
   const dt = Math.min(0.033, (now - state.lastFrame) / 1000);
   state.lastFrame = now;
+  state.perf.avgDt = state.perf.avgDt * 0.92 + dt * 0.08;
+  state.perf.ambientTick = Math.max(0, state.perf.ambientTick - dt);
+  if (!state.lowFx && state.perf.avgDt > 0.026) {
+    state.perf.slowFrames += 1;
+    if (state.perf.slowFrames > 100) {
+      state.lowFx = true;
+      state.perf.autoLowFx = true;
+      savePerformanceMode(true);
+      applyStaticText();
+      pushLog(langText("프레임 저하를 감지해 간소화 모드로 전환했습니다.", "Frame drop detected. Switched to Lite FX."));
+    }
+  } else if (state.perf.avgDt < 0.021) {
+    state.perf.slowFrames = Math.max(0, state.perf.slowFrames - 2);
+  } else {
+    state.perf.slowFrames = Math.max(0, state.perf.slowFrames - 1);
+  }
   update(dt);
   updateAmbientAudio();
   draw();
@@ -5232,6 +5304,7 @@ if (window.matchMedia && window.matchMedia("(pointer: coarse)").matches) {
   state.movementMode = "click";
 }
 
+refreshRuntimeState();
 applyStaticText();
 syncStageLayout();
 pushLog(langText("빈 방을 점거하고, 운을 뚫으며 탈출하세요.", "Find a vacant room, then build enough luck to escape."));
