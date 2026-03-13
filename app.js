@@ -3600,7 +3600,9 @@ function drawBackdrop() {
   ctx.fillStyle = blueBloom;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  drawSpeedLines(dangerLevel() * 0.22);
+  if (dangerLevel() > 0.18) {
+    drawSpeedLines(dangerLevel() * 0.14);
+  }
 }
 
 function drawAtmosphere() {
@@ -3608,18 +3610,18 @@ function drawAtmosphere() {
   const danger = dangerLevel();
 
   ctx.save();
-  for (let i = 0; i < 4; i += 1) {
+  for (let i = 0; i < 2; i += 1) {
     const y = 110 + i * 170 + Math.sin(time * 0.22 + i) * 18;
     const x = ((time * (18 + i * 6)) % (WIDTH + 340)) - 220;
     const fog = ctx.createLinearGradient(x, y, x + 260, y + 40);
     fog.addColorStop(0, "rgba(130, 176, 255, 0)");
-    fog.addColorStop(0.5, `rgba(130, 176, 255, ${0.035 + danger * 0.03})`);
+    fog.addColorStop(0.5, `rgba(130, 176, 255, ${0.02 + danger * 0.02})`);
     fog.addColorStop(1, "rgba(130, 176, 255, 0)");
     ctx.fillStyle = fog;
     ctx.fillRect(x, y, 320, 54);
   }
 
-  for (let i = 0; i < 24; i += 1) {
+  for (let i = 0; i < 10; i += 1) {
     const seed = i * 37.17;
     const px = ((time * (12 + (i % 5) * 4) + seed * 19) % (WIDTH + 80)) - 40;
     const py = 40 + ((seed * 53 + time * (6 + (i % 3))) % (HEIGHT - 80));
@@ -3645,9 +3647,11 @@ function drawZones() {
     ctx.fillStyle = fill;
     ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    ctx.fillStyle = "rgba(255, 255, 255, 0.025)";
-    for (let offset = -zone.h; offset < zone.w; offset += 18) {
-      ctx.fillRect(zone.x + offset, zone.y, 6, zone.h);
+    if (zone.id === "hall" || zone.id === "upperHall") {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.018)";
+      for (let offset = -zone.h; offset < zone.w; offset += 34) {
+        ctx.fillRect(zone.x + offset, zone.y, 4, zone.h);
+      }
     }
   }
 
@@ -3685,24 +3689,10 @@ function drawZones() {
     ctx.letterSpacing = "1px";
     ctx.fillText(room.label.toUpperCase(), room.x + 14, room.y + 22);
 
-    if (!room.owner && distance(game.player, room.bed) < 90) {
-      drawWorldLabel(room.bed.x, room.bed.y - 34, langText("빈 침대", "Vacant Bed"), "rgba(133, 216, 255, 0.95)");
-    } else if (playerRoom && distance(game.player, room.bed) < 96) {
-      drawWorldLabel(room.bed.x, room.bed.y - 34, langText("침대: 회복 + 추가 수익", "Bed: heal + bonus gold"), "rgba(111, 229, 255, 0.95)");
-    }
-    if (playerRoom && distance(game.player, room.altar) < 88) {
-      drawWorldLabel(room.altar.x, room.altar.y - 32, langText("제단: 수호자 소환", "Altar: summon"), "rgba(255, 199, 143, 0.95)");
-    }
-    if (playerRoom && distance(game.player, room.terminal) < 88) {
-      drawWorldLabel(room.terminal.x, room.terminal.y - 32, langText("단말: 지도 정보", "Terminal: intel"), "rgba(143, 232, 255, 0.95)");
-    }
   }
 
   if (world.generatorRoom.floor === game.player.floor) {
     drawGeneratorFixture(world.generator.x, world.generator.y, 1.05, nearbyPrompt?.type === "generator");
-    if (distance(game.player, world.generator) < 110) {
-      drawWorldLabel(world.generator.x, world.generator.y - 44, langText("발전기", "Generator"), "rgba(255, 232, 141, 0.95)");
-    }
   }
   if (world.exitRoom.floor === game.player.floor) {
     drawCelOrb(world.exitRoom.x + 68, world.exitRoom.y + 70, 24, colors.exit, "#ddf5ff", 0.15);
@@ -3713,14 +3703,6 @@ function drawZones() {
       continue;
     }
     drawElevatorFixture(elevator.x, elevator.y, 1, nearbyPrompt?.type === "elevator" && nearbyPrompt.elevator?.id === elevator.id);
-    if (distance(game.player, elevator) < 84) {
-      drawWorldLabel(
-        elevator.x,
-        elevator.y - 34,
-        langText(elevator.destinationFloor === "f2" ? "엘리베이터: 2층" : "엘리베이터: 1층", elevator.destinationFloor === "f2" ? "Elevator: Floor 2" : "Elevator: Floor 1"),
-        "rgba(218, 222, 255, 0.95)",
-      );
-    }
   }
 
   if (game.anomaly && game.anomaly.floor === game.player.floor) {
@@ -3728,6 +3710,26 @@ function drawZones() {
     drawCelOrb(game.anomaly.x, game.anomaly.y, 14, "#7c45bf", "#f4dbff", 0.22);
     drawPulseRing(game.anomaly.x, game.anomaly.y, pulse, "rgba(212, 149, 255, 0.28)");
     drawPulseRing(game.anomaly.x, game.anomaly.y, pulse + 12, "rgba(255, 221, 111, 0.18)");
+  }
+
+  if (nearbyPrompt?.type === "claim" && nearbyPrompt.room) {
+    drawWorldLabel(nearbyPrompt.room.bed.x, nearbyPrompt.room.bed.y - 34, langText("빈 침대: E로 점거", "Vacant Bed: press E"), "rgba(133, 216, 255, 0.95)");
+  } else if (nearbyPrompt?.type === "summon" && nearbyPrompt.room) {
+    drawWorldLabel(nearbyPrompt.room.altar.x, nearbyPrompt.room.altar.y - 32, langText("제단: E로 소환", "Altar: press E"), "rgba(255, 199, 143, 0.95)");
+  } else if (nearbyPrompt?.type === "intel" && nearbyPrompt.room) {
+    drawWorldLabel(nearbyPrompt.room.terminal.x, nearbyPrompt.room.terminal.y - 32, langText("단말: E로 정보 구매", "Terminal: press E"), "rgba(143, 232, 255, 0.95)");
+  } else if (nearbyPrompt?.type === "generator") {
+    drawWorldLabel(world.generator.x, world.generator.y - 44, langText("발전기: E 유지", "Generator: hold E"), "rgba(255, 232, 141, 0.95)");
+  } else if (nearbyPrompt?.type === "elevator" && nearbyPrompt.elevator) {
+    drawWorldLabel(
+      nearbyPrompt.elevator.x,
+      nearbyPrompt.elevator.y - 34,
+      langText(
+        nearbyPrompt.elevator.destinationFloor === "f2" ? "엘리베이터: 2층" : "엘리베이터: 1층",
+        nearbyPrompt.elevator.destinationFloor === "f2" ? "Elevator: Floor 2" : "Elevator: Floor 1",
+      ),
+      "rgba(218, 222, 255, 0.95)",
+    );
   }
 }
 
@@ -3947,12 +3949,12 @@ function drawUnits() {
     drawShadow(unit.x, unit.y + 12, radius + 6, 0.18);
     drawCelOrb(unit.x, unit.y + bob, radius, color, "#ffffff", unit.type === "relic" ? 0.28 : 0.14);
     if (unit.role === "anchor") {
-      drawPulseRing(unit.x, unit.y + bob, radius + 10, "rgba(133, 216, 255, 0.18)");
+      drawPulseRing(unit.x, unit.y + bob, radius + 8, "rgba(133, 216, 255, 0.14)");
     } else if (unit.role === "interceptor") {
-      drawPulseRing(unit.x, unit.y + bob, radius + 8 + Math.sin(game.time * 6 + unit.x) * 2, "rgba(185, 239, 170, 0.18)");
+      drawPulseRing(unit.x, unit.y + bob, radius + 6 + Math.sin(game.time * 6 + unit.x) * 1.5, "rgba(185, 239, 170, 0.14)");
     }
     if (unit.type === "relic") {
-      drawPulseRing(unit.x, unit.y + bob, 18 + Math.sin(game.time * 3.6 + unit.x) * 2, "rgba(212, 149, 255, 0.28)");
+      drawPulseRing(unit.x, unit.y + bob, 16 + Math.sin(game.time * 3.6 + unit.x) * 1.5, "rgba(212, 149, 255, 0.18)");
     }
   }
 }
@@ -4274,9 +4276,9 @@ function drawCharacter(entity, kind) {
     ctx.beginPath();
     ctx.arc(drawX, drawY, radius + 12 + Math.sin(game.time * 3.8) * 1.8, 0, Math.PI * 2);
     ctx.stroke();
-    drawPulseRing(drawX, drawY, radius + 20 + Math.sin(game.time * 4.8) * 2.8, "rgba(133, 216, 255, 0.22)");
+    drawPulseRing(drawX, drawY, radius + 18 + Math.sin(game.time * 4.8) * 2, "rgba(133, 216, 255, 0.16)");
     if (entity.spawnShield > 0) {
-      drawPulseRing(drawX, drawY, radius + 28 + Math.sin(game.time * 7.2) * 3, "rgba(255, 221, 111, 0.28)");
+      drawPulseRing(drawX, drawY, radius + 24 + Math.sin(game.time * 7.2) * 2, "rgba(255, 221, 111, 0.18)");
     }
     ctx.fillStyle = "#f5fbff";
     ctx.font = "700 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
@@ -4290,7 +4292,7 @@ function drawCharacter(entity, kind) {
     ctx.fill();
     ctx.restore();
   } else if (kind === "hunter") {
-    drawPulseRing(drawX, drawY, radius + 18 + Math.sin(game.time * 6.4) * 3, "rgba(255, 92, 132, 0.16)");
+    drawPulseRing(drawX, drawY, radius + 16 + Math.sin(game.time * 6.4) * 2, "rgba(255, 92, 132, 0.12)");
   }
 
   ctx.save();
