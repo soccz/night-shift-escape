@@ -368,8 +368,9 @@ button:active {
 
 .title-copy {
   margin: 16px 0 22px;
-  color: var(--muted);
-  line-height: 1.6;
+  color: #c8d8f0;
+  line-height: 1.75;
+  font-size: 14px;
   max-width: 44ch;
 }
 

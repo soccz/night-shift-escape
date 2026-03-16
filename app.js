@@ -91,7 +91,7 @@ const I18N = {
     titleKicker: "Night Protocol",
     titleOverlayHeading: "격리 구역 진입",
     titleOverlayCopy:
-      "빈 방을 점거하고, 확률을 뚫어 버티고, 정전을 견디고, 복도가 네 이름을 기억하기 전에 탈출하세요.",
+      "① 빈 방 진입 후 E 눌러 점거\n② 침대(BED) 위에 서면 골드 획득 + 체력 회복\n③ 단말기(TERMINAL)에서 지도 조각 구입 (골드 소모)\n④ 조각 6개 + 시질 2개 모으면 탈출구 개방\n\n조작: WASD 이동  |  E 상호작용  |  R 문 강화",
     start: "작전 시작",
     missionHeading: "임무 피드",
     runHeading: "현재 런",
@@ -188,7 +188,7 @@ const I18N = {
     titleKicker: "Night Protocol",
     titleOverlayHeading: "Enter The Ward",
     titleOverlayCopy:
-      "Claim a room. Rig the odds. Survive the blackout. Escape before the corridor learns your name.",
+      "① Enter a vacant room and press E to claim it\n② Stand on the BED to earn gold + heal\n③ Use the TERMINAL to buy map fragments (costs gold)\n④ Collect 6 fragments + 2 sigils to open the exit\n\nWASD: Move  |  E: Interact  |  R: Reinforce door",
     start: "Start Operation",
     missionHeading: "Mission Feed",
     runHeading: "Run",
@@ -1502,7 +1502,7 @@ function applyStaticText() {
   alarmStrip.textContent = t("alarm");
   titleKicker.textContent = t("titleKicker");
   titleOverlayHeading.textContent = t("titleOverlayHeading");
-  titleOverlayCopy.textContent = t("titleOverlayCopy");
+  titleOverlayCopy.innerHTML = t("titleOverlayCopy").replace(/\n/g, "<br>");
   startButton.textContent = t("start");
   missionHeading.textContent = t("missionHeading");
   runHeading.textContent = t("runHeading");
@@ -3746,20 +3746,32 @@ function drawZones() {
     if (zone.floor !== game.player.floor) {
       continue;
     }
-    const fill = zone.id === "hall" ? "#131a28" : "#111827";
-    ctx.fillStyle = fill;
+    const isHall = zone.id === "hall" || zone.id === "upperHall";
+    // 복도는 더 어둡고 파란색, 방은 약간 밝은 톤으로 구분
+    ctx.fillStyle = isHall ? "#0d1320" : "#161d2e";
     ctx.fillRect(zone.x, zone.y, zone.w, zone.h);
 
-    if (zone.id === "hall" || zone.id === "upperHall") {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.018)";
+    if (isHall) {
+      // 복도: 대각선 스트라이프 패턴
+      ctx.fillStyle = "rgba(255, 255, 255, 0.025)";
       for (let offset = -zone.h; offset < zone.w; offset += 34) {
         ctx.fillRect(zone.x + offset, zone.y, 4, zone.h);
+      }
+    } else {
+      // 방: 미세한 그리드 패턴으로 복도와 구분
+      ctx.fillStyle = "rgba(133, 186, 255, 0.025)";
+      for (let gx = zone.x; gx < zone.x + zone.w; gx += 28) {
+        ctx.fillRect(gx, zone.y, 1, zone.h);
+      }
+      for (let gy = zone.y; gy < zone.y + zone.h; gy += 28) {
+        ctx.fillRect(zone.x, gy, zone.w, 1);
       }
     }
   }
 
-  ctx.strokeStyle = "rgba(166, 204, 255, 0.16)";
-  ctx.lineWidth = 2.5;
+  // 복도 테두리: 더 진한 파란색 테두리
+  ctx.strokeStyle = "rgba(100, 150, 220, 0.22)";
+  ctx.lineWidth = 1.5;
   for (const zone of world.zones) {
     if (zone.floor !== game.player.floor) {
       continue;
@@ -3772,14 +3784,51 @@ function drawZones() {
       continue;
     }
     const playerRoom = room.owner === "player";
+    const isClaimable = !room.owner && nearbyPrompt?.type === "claim";
+
+    // 소유 방: 바닥에 청록색 틴트 오버레이
+    if (playerRoom) {
+      ctx.fillStyle = "rgba(100, 200, 255, 0.07)";
+      ctx.fillRect(room.x, room.y, room.w, room.h);
+    }
+
+    // 점거 가능한 방: 노란 틴트로 강조
+    if (isClaimable) {
+      ctx.fillStyle = `rgba(255, 220, 80, ${0.04 + Math.sin(game.time * 3) * 0.02})`;
+      ctx.fillRect(room.x, room.y, room.w, room.h);
+    }
+
     drawBedFixture(room.bed.x, room.bed.y, 1, playerRoom || nearbyPrompt?.type === "claim");
     drawAltarFixture(room.altar.x, room.altar.y, 1, localOwnedRoom?.id === room.id && nearbyPrompt?.type === "summon");
     drawTerminalFixture(room.terminal.x, room.terminal.y, 1, localOwnedRoom?.id === room.id && nearbyPrompt?.type === "intel");
 
+    // 소유 방: 더 굵고 밝은 테두리 + 코너 마크
     if (playerRoom) {
-      ctx.strokeStyle = "rgba(133, 216, 255, 0.8)";
-      ctx.lineWidth = 3.5;
-      ctx.strokeRect(room.x + 4, room.y + 4, room.w - 8, room.h - 8);
+      const pulse = 0.7 + Math.sin(game.time * 2.2) * 0.2;
+      ctx.strokeStyle = `rgba(133, 216, 255, ${pulse})`;
+      ctx.lineWidth = 4;
+      ctx.strokeRect(room.x + 3, room.y + 3, room.w - 6, room.h - 6);
+      // 코너 강조
+      const cs = 14;
+      ctx.strokeStyle = "rgba(133, 216, 255, 1)";
+      ctx.lineWidth = 3;
+      [[room.x + 3, room.y + 3], [room.x + room.w - 3, room.y + 3],
+       [room.x + 3, room.y + room.h - 3], [room.x + room.w - 3, room.y + room.h - 3]].forEach(([cx, cy], i) => {
+        const dx = i % 2 === 0 ? 1 : -1;
+        const dy = i < 2 ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + dy * cs);
+        ctx.lineTo(cx, cy);
+        ctx.lineTo(cx + dx * cs, cy);
+        ctx.stroke();
+      });
+    } else if (isClaimable) {
+      // 점거 가능: 점선 테두리
+      ctx.setLineDash([8, 6]);
+      ctx.strokeStyle = `rgba(255, 212, 80, ${0.5 + Math.sin(game.time * 3) * 0.2})`;
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(room.x + 3, room.y + 3, room.w - 6, room.h - 6);
+      ctx.setLineDash([]);
     }
 
     if (room.breach) {
@@ -3787,11 +3836,30 @@ function drawZones() {
       ctx.fillRect(room.x + room.w - 12, room.y + room.h / 2 - 30, 12, 60);
     }
 
-    ctx.fillStyle = room.owner === "player" ? "#f5fbff" : "rgba(230, 236, 255, 0.54)";
-    ctx.font = "700 13px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+    // 방 이름: 더 크고 배경 칩과 함께
+    const labelX = room.x + 12;
+    const labelY = room.y + 20;
+    ctx.font = `700 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif`;
     ctx.letterSpacing = "1px";
-    ctx.fillText(room.label.toUpperCase(), room.x + 14, room.y + 22);
+    if (playerRoom) {
+      ctx.fillStyle = "rgba(10, 20, 40, 0.72)";
+      ctx.fillRect(labelX - 4, labelY - 14, ctx.measureText(room.label.toUpperCase()).width + 10, 18);
+      ctx.fillStyle = "#85d8ff";
+    } else {
+      ctx.fillStyle = "rgba(200, 220, 255, 0.7)";
+    }
+    ctx.fillText(room.label.toUpperCase(), labelX, labelY);
 
+    // 오브젝트 항상 레이블 표시
+    const fixtureLabelStyle = "600 11px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+    ctx.font = fixtureLabelStyle;
+    ctx.letterSpacing = "0.5px";
+    ctx.fillStyle = "rgba(180, 220, 255, 0.55)";
+    ctx.fillText("BED", room.bed.x - 10, room.bed.y - 16);
+    ctx.fillStyle = "rgba(255, 200, 150, 0.55)";
+    ctx.fillText("ALTAR", room.altar.x - 14, room.altar.y - 16);
+    ctx.fillStyle = "rgba(140, 240, 255, 0.55)";
+    ctx.fillText("TERMINAL", room.terminal.x - 22, room.terminal.y - 16);
   }
 
   if (world.generatorRoom.floor === game.player.floor) {
@@ -4399,9 +4467,9 @@ function drawCharacter(entity, kind) {
     if (entity.spawnShield > 0) {
       drawPulseRing(drawX, drawY, radius + 24 + Math.sin(game.time * 7.2) * 2, "rgba(255, 221, 111, 0.18)");
     }
-    ctx.fillStyle = "#f5fbff";
-    ctx.font = "700 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-    ctx.fillText(t("player_tag"), drawX - 14, drawY - radius - 18);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 16px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+    ctx.fillText(t("player_tag"), drawX - 16, drawY - radius - 20);
     ctx.beginPath();
     ctx.moveTo(drawX, drawY - radius - 18);
     ctx.lineTo(drawX - 8, drawY - radius - 34);
