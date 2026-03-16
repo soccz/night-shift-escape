@@ -1695,7 +1695,7 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (state.adminMode && !state.titleVisible && game) {
+  if (state.adminMode && !state.titleVisible && game && game.phase === "running") {
     if (key === "g") {
       event.preventDefault();
       state.godMode = !state.godMode;
@@ -1938,14 +1938,14 @@ function attemptReinforce() {
   reinforceDoor(ownedRoom, "player");
 }
 
-function getReinforceCost() {
+function getReinforceCost(room = null) {
   const base = CONFIG.door.reinforceBaseCost + Math.floor(game.time / CONFIG.door.reinforceTimeStep) * CONFIG.door.reinforceCostStep;
-  const traitMult = getRoomTrait(getOwnedRoom())?.effect.reinforceCostMult || 1;
+  const traitMult = getRoomTrait(room || getOwnedRoom())?.effect.reinforceCostMult || 1;
   return Math.round(base * traitMult);
 }
 
 function reinforceDoor(room, actorType, hider = null) {
-  const cost = getReinforceCost();
+  const cost = getReinforceCost(room);
   const bankroll = actorType === "player" ? game.gold : hider?.gold || 0;
   if (bankroll < cost) {
     if (actorType === "player") {
@@ -2460,6 +2460,7 @@ function update(dt) {
   updateHiders(dt);
   updateUnits(dt);
   updateHunter(dt);
+  game.hiders = game.hiders.filter((h) => h.alive);
   updateInfected(dt);
   collectKeycards();
   updateContracts(dt);
@@ -2783,6 +2784,10 @@ function updateUnits(dt) {
   for (let i = game.units.length - 1; i >= 0; i -= 1) {
     const unit = game.units[i];
     const unitRoom = getRoomById(unit.roomId);
+    if (!unitRoom || unitRoom.owner === "infected") {
+      game.units.splice(i, 1);
+      continue;
+    }
     unit.cooldown -= dt;
 
     if (unit.type === "husk") {
@@ -3597,6 +3602,7 @@ function issueContract() {
   const pool = ["upperSweep", "purge", "signalTap"];
   const contractId = pickOne(pool);
   game.contract = createContract(contractId);
+  game.contract.expiresIn = 90;
   game.nextContractTimer = randomRange(28, 42);
   pushLog(
     langText(
@@ -3658,6 +3664,14 @@ function updateContracts(dt) {
 
   if (game.contract.id === "upperSweep" && game.player.floor === "f2") {
     game.contract.progress += dt;
+  }
+
+  game.contract.expiresIn -= dt;
+  if (game.contract.expiresIn <= 0) {
+    pushLog(langText("계약 시간 초과.", "Contract expired."));
+    game.contract = null;
+    game.nextContractTimer = randomRange(45, 65);
+    return;
   }
 
   if (contractProgressValue(game.contract) >= game.contract.target) {
@@ -4048,9 +4062,26 @@ function draw() {
   }
   drawLighting();
   ctx.restore();
+  drawWardEventIndicator();
   drawBanner();
   drawFlashOverlay();
   drawMessageOverlay();
+}
+
+function drawWardEventIndicator() {
+  if (!game.wardEvent) return;
+  const wdef = WARD_EVENTS.find((e) => e.id === game.wardEvent.id);
+  if (!wdef) return;
+  const label = `⚠ ${langText(wdef.label.ko, wdef.label.en)} (${Math.ceil(game.wardEvent.timer)}s)`;
+  ctx.save();
+  ctx.font = "700 12px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+  ctx.fillStyle = "rgba(10, 8, 20, 0.72)";
+  const lw = ctx.measureText(label).width;
+  ctx.fillRect(WIDTH / 2 - lw / 2 - 8, 4, lw + 16, 22);
+  ctx.fillStyle = "rgba(212, 149, 255, 0.92)";
+  ctx.textAlign = "center";
+  ctx.fillText(label, WIDTH / 2, 20);
+  ctx.restore();
 }
 
 function drawBackdrop() {
@@ -4311,21 +4342,6 @@ function drawZones() {
     ctx.fillRect(barX, barY, barW * pct, 6);
   }
 
-  // Ward event indicator
-  if (game.wardEvent) {
-    const wdef = WARD_EVENTS.find((e) => e.id === game.wardEvent.id);
-    if (wdef) {
-      const label = `⚠ ${langText(wdef.label.ko, wdef.label.en)} (${Math.ceil(game.wardEvent.timer)}s)`;
-      ctx.font = "700 12px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
-      ctx.fillStyle = "rgba(10, 8, 20, 0.72)";
-      const lw = ctx.measureText(label).width;
-      ctx.fillRect(WIDTH / 2 - lw / 2 - 8, 4, lw + 16, 22);
-      ctx.fillStyle = "rgba(212, 149, 255, 0.92)";
-      ctx.textAlign = "center";
-      ctx.fillText(label, WIDTH / 2, 20);
-      ctx.textAlign = "left";
-    }
-  }
 }
 
 function roundedRectPath(x, y, w, h, r) {
@@ -4830,14 +4846,27 @@ function drawHudMap() {
   }
 
   if (game.compassTime > 0 && game.fragments >= 6) {
+    const gate = world.exitRoom.gate;
+    const gateCx = gate.x + gate.w / 2;
+    const gateCy = gate.y + gate.h / 2;
+    const angle = Math.atan2(gateCy - game.player.y, gateCx - game.player.x);
+    const cx = panel.x + panel.w - 41;
+    const cy = panel.y + 42;
+    const arrowLen = 17;
+    const tipX = cx + Math.cos(angle) * arrowLen;
+    const tipY = cy + Math.sin(angle) * arrowLen;
+    const headA = 0.42;
+    ctx.save();
     ctx.strokeStyle = "#ffd36b";
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(panel.x + panel.w - 58, panel.y + 42);
-    ctx.lineTo(panel.x + panel.w - 24, panel.y + 42);
-    ctx.lineTo(panel.x + panel.w - 34, panel.y + 30);
-    ctx.moveTo(panel.x + panel.w - 24, panel.y + 42);
-    ctx.lineTo(panel.x + panel.w - 34, panel.y + 54);
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tipX, tipY);
+    ctx.lineTo(tipX - Math.cos(angle - headA) * 8, tipY - Math.sin(angle - headA) * 8);
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - Math.cos(angle + headA) * 8, tipY - Math.sin(angle + headA) * 8);
     ctx.stroke();
+    ctx.restore();
     ctx.fillStyle = "#ffd36b";
     ctx.fillText(langText("탈출", "Exit"), panel.x + panel.w - 58, panel.y + 72);
   }
@@ -4847,6 +4876,7 @@ function drawMessageOverlay() {
   if (game.phase === "running") {
     return;
   }
+  ctx.save();
   ctx.fillStyle = "rgba(5, 8, 9, 0.72)";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.textAlign = "center";
@@ -4897,7 +4927,7 @@ function drawMessageOverlay() {
   ctx.font = "600 14px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
   ctx.fillStyle = "rgba(231, 239, 248, 0.65)";
   ctx.fillText(langText("다시 시작을 눌러 새 런을 시작하세요.", "Press Restart Run to begin again."), WIDTH / 2, panelY + 150);
-  ctx.textAlign = "left";
+  ctx.restore();
 }
 
 function drawCircle(x, y, radius, fill) {
