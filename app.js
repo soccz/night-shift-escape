@@ -29,6 +29,9 @@ const performanceButton = document.getElementById("performanceButton");
 const hudToggleButton = document.getElementById("hudToggleButton");
 const muteButton = document.getElementById("muteButton");
 const pauseButton = document.getElementById("pauseButton");
+const guideButton = document.getElementById("guideButton");
+const guideOverlay = document.getElementById("guideOverlay");
+const guideCloseButton = document.getElementById("guideCloseButton");
 const dockModeButton = document.getElementById("dockModeButton");
 const dockInteractButton = document.getElementById("dockInteractButton");
 const dockReinforceButton = document.getElementById("dockReinforceButton");
@@ -1499,6 +1502,7 @@ function applyStaticText() {
   muteButton.textContent = state.audio.muted ? t("mute_off") : t("mute_on");
   pauseButton.textContent = state.paused ? t("resume") : t("pause");
   restartButton.textContent = t("restart");
+  guideButton.textContent = state.lang === "ko" ? "가이드" : "Guide";
   alarmStrip.textContent = t("alarm");
   titleKicker.textContent = t("titleKicker");
   titleOverlayHeading.textContent = t("titleOverlayHeading");
@@ -1529,6 +1533,18 @@ function applyStaticText() {
 
 restartButton.addEventListener("click", resetGame);
 startButton.addEventListener("click", startRun);
+guideButton.addEventListener("click", () => {
+  guideOverlay.classList.toggle("hidden");
+  if (!guideOverlay.classList.contains("hidden") && game && game.phase === "running" && !state.paused) {
+    setPaused(true);
+  }
+});
+guideCloseButton.addEventListener("click", () => {
+  guideOverlay.classList.add("hidden");
+});
+guideOverlay.addEventListener("click", (e) => {
+  if (e.target === guideOverlay) guideOverlay.classList.add("hidden");
+});
 languageButton.addEventListener("click", toggleLanguage);
 performanceButton.addEventListener("click", () => {
   state.lowFx = !state.lowFx;
@@ -1590,6 +1606,10 @@ window.addEventListener("keydown", (event) => {
 
   if (event.key === "Escape" || key === "p" || code === "KeyP") {
     event.preventDefault();
+    if (!guideOverlay.classList.contains("hidden")) {
+      guideOverlay.classList.add("hidden");
+      return;
+    }
     togglePause();
     return;
   }

@@ -19,6 +19,7 @@
           <div class="theme-chip" id="themeChip">Cel Horror HUD</div>
           <button id="performanceButton" type="button" aria-label="성능 모드 전환">간소화</button>
           <button id="hudToggleButton" type="button" aria-label="HUD 표시 전환">HUD</button>
+          <button id="guideButton" type="button" aria-label="게임 가이드">가이드</button>
           <button id="muteButton" type="button" aria-label="사운드 켜기/끄기">사운드</button>
           <button id="pauseButton" type="button" aria-label="일시정지">일시정지</button>
           <button id="restartButton" type="button" aria-label="게임 다시 시작">다시 시작</button>
@@ -98,6 +99,105 @@
           </section>
         </aside>
       </main>
+    </div>
+
+    <!-- Guide Modal -->
+    <div class="guide-overlay hidden" id="guideOverlay" role="dialog" aria-modal="true" aria-labelledby="guideTitle">
+      <div class="guide-modal">
+        <div class="guide-header">
+          <p class="title-kicker">Protocol A-13</p>
+          <h2 id="guideTitle">게임 가이드</h2>
+          <button class="guide-close" id="guideCloseButton" aria-label="닫기">✕</button>
+        </div>
+
+        <div class="guide-body">
+
+          <!-- 목표 -->
+          <section class="guide-section">
+            <h3 class="guide-section-title" data-i18n="guide_goal_title">🎯 목표</h3>
+            <div class="guide-steps">
+              <div class="guide-step"><span class="step-num">1</span><div><strong data-i18n="guide_step1_label">방 점거</strong><p data-i18n="guide_step1_desc">빈 방에 들어가 <kbd>E</kbd>를 눌러 점거하세요. 방이 골드를 생산하기 시작합니다.</p></div></div>
+              <div class="guide-step"><span class="step-num">2</span><div><strong data-i18n="guide_step2_label">골드 획득</strong><p data-i18n="guide_step2_desc">침대(BED) 위에 서면 골드가 더 빨리 쌓이고, 체력도 회복됩니다.</p></div></div>
+              <div class="guide-step"><span class="step-num">3</span><div><strong data-i18n="guide_step3_label">지도 조각 구입</strong><p data-i18n="guide_step3_desc">단말기(TERMINAL)에서 <kbd>E</kbd>를 눌러 골드로 지도 조각을 구입하세요. <strong>6개</strong>가 필요합니다.</p></div></div>
+              <div class="guide-step"><span class="step-num">4</span><div><strong data-i18n="guide_step4_label">시질 수집</strong><p data-i18n="guide_step4_desc">조각이 쌓이면 맵에 황금색 시질이 나타납니다. <strong>2개</strong>를 모두 수집하세요.</p></div></div>
+              <div class="guide-step step-escape"><span class="step-num">5</span><div><strong data-i18n="guide_step5_label">탈출</strong><p data-i18n="guide_step5_desc">탈출구(SERVICE GATE)로 이동해 <kbd>E</kbd>를 눌러 탈출하세요!</p></div></div>
+            </div>
+          </section>
+
+          <!-- 캐릭터 -->
+          <section class="guide-section">
+            <h3 class="guide-section-title" data-i18n="guide_chars_title">👾 등장 요소</h3>
+            <div class="guide-entities">
+              <div class="guide-entity">
+                <div class="entity-dot" style="background:#dbece1; box-shadow:0 0 8px #85d8ff;"></div>
+                <div><strong data-i18n="guide_char_player">나 (YOU)</strong><p data-i18n="guide_char_player_desc">플레이어. 방을 점거하고 탈출하는 것이 목표입니다.</p></div>
+              </div>
+              <div class="guide-entity">
+                <div class="entity-dot" style="background:#d84a4a; box-shadow:0 0 8px #ff6f95;"></div>
+                <div><strong data-i18n="guide_char_hunter">헌터 (HUNTER)</strong><p data-i18n="guide_char_hunter_desc">빨간 적. 게임 내내 당신을 추적합니다. 직접 대면하지 마세요.</p></div>
+              </div>
+              <div class="guide-entity">
+                <div class="entity-dot" style="background:#d27447; box-shadow:0 0 8px #ffb464;"></div>
+                <div><strong data-i18n="guide_char_infected">감염체 (INFECTED)</strong><p data-i18n="guide_char_infected_desc">주황색. 정전(Blackout) 때 발전기 근처에서 출몰합니다. 문을 부수고 체력을 깎습니다.</p></div>
+              </div>
+              <div class="guide-entity">
+                <div class="entity-dot" style="background:#8e6cff; box-shadow:0 0 8px #d3c0ff;"></div>
+                <div><strong data-i18n="guide_char_wisp">위스프 (WISP)</strong><p data-i18n="guide_char_wisp_desc">보라색 감염체. 빠르고 문을 통과합니다. 2층에 등장합니다.</p></div>
+              </div>
+              <div class="guide-entity">
+                <div class="entity-dot" style="background:#9ecbff; box-shadow:0 0 8px #85d8ff;"></div>
+                <div><strong data-i18n="guide_char_hider">은신자 (HIDER)</strong><p data-i18n="guide_char_hider_desc">하늘색. 적대적 NPC로 다른 방을 점거하고 당신을 방해합니다.</p></div>
+              </div>
+              <div class="guide-entity">
+                <div class="entity-dot" style="background:#7dc5ff; box-shadow:0 0 8px #7dc5ff;"></div>
+                <div><strong data-i18n="guide_char_ally">수호자 (GUARDIAN)</strong><p data-i18n="guide_char_ally_desc">청록/초록/보라색. 제단(ALTAR)에서 소환한 아군입니다. 적과 싸워줍니다.</p></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 오브젝트 -->
+          <section class="guide-section">
+            <h3 class="guide-section-title" data-i18n="guide_objects_title">🏠 방 안의 오브젝트</h3>
+            <div class="guide-objects">
+              <div class="guide-object">
+                <div class="obj-icon" style="background:#2f4e49; border-color:#77b6df;">BED</div>
+                <div><strong data-i18n="guide_obj_bed">침대</strong><p data-i18n="guide_obj_bed_desc">위에 서면 골드 수입 +7/초, 체력 +5/초 회복. 자기 방에서만 작동.</p></div>
+              </div>
+              <div class="guide-object">
+                <div class="obj-icon" style="background:#3d2a25; border-color:#ffd1ab;">ALT</div>
+                <div><strong data-i18n="guide_obj_altar">제단 (ALTAR)</strong><p data-i18n="guide_obj_altar_desc"><kbd>E</kbd>를 눌러 골드로 수호자를 랜덤 소환. 방어를 강화합니다.</p></div>
+              </div>
+              <div class="guide-object">
+                <div class="obj-icon" style="background:#202f39; border-color:#8cecff;">TRM</div>
+                <div><strong data-i18n="guide_obj_terminal">단말기 (TERMINAL)</strong><p data-i18n="guide_obj_terminal_desc"><kbd>E</kbd>를 눌러 골드로 지도 조각 구입. 확률적으로 레이더가 나오기도 함.</p></div>
+              </div>
+              <div class="guide-object">
+                <div class="obj-icon" style="background:#5e6240; border-color:#ffef8c;">GEN</div>
+                <div><strong data-i18n="guide_obj_gen">발전기 (GENERATOR)</strong><p data-i18n="guide_obj_gen_desc">정전 시 <kbd>E</kbd>를 길게 눌러 수리. 수리 안 하면 감염체가 계속 몰려옵니다.</p></div>
+              </div>
+              <div class="guide-object">
+                <div class="obj-icon" style="background:#634646; border-color:#ffd36b;">SGL</div>
+                <div><strong data-i18n="guide_obj_sigil">시질 (SIGIL)</strong><p data-i18n="guide_obj_sigil_desc">황금색 다이아몬드. 조각 수집 후 맵에 나타납니다. 가까이 가면 자동 수집.</p></div>
+              </div>
+              <div class="guide-object">
+                <div class="obj-icon" style="background:#3d6e63; border-color:#ddf5ff;">EXIT</div>
+                <div><strong data-i18n="guide_obj_exit">탈출구 (SERVICE GATE)</strong><p data-i18n="guide_obj_exit_desc">조각 6개 + 시질 2개 모으면 열립니다. <kbd>E</kbd>를 눌러 탈출.</p></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 위협 & 생존 -->
+          <section class="guide-section">
+            <h3 class="guide-section-title" data-i18n="guide_survive_title">⚠️ 위협과 생존</h3>
+            <div class="guide-tips">
+              <div class="guide-tip danger"><strong data-i18n="guide_tip_blackout">정전 (BLACKOUT)</strong><p data-i18n="guide_tip_blackout_desc">주기적으로 발생. 화면이 어두워지고 감염체가 쏟아집니다. 발전기로 달려가 수리하세요.</p></div>
+              <div class="guide-tip warn"><strong data-i18n="guide_tip_door">문 강화 (R)</strong><p data-i18n="guide_tip_door_desc">문은 파괴됩니다. <kbd>R</kbd>을 눌러 강화하면 오래 버팁니다. 방어의 핵심.</p></div>
+              <div class="guide-tip info"><strong data-i18n="guide_tip_floor2">2층 이동</strong><p data-i18n="guide_tip_floor2_desc">엘리베이터를 이용해 2층으로 올라갈 수 있습니다. 더 강한 적이 있지만 보상도 큽니다.</p></div>
+            </div>
+          </section>
+
+        </div>
+      </div>
     </div>
 
     <script src="./app.js"></script>

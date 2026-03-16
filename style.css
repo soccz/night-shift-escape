@@ -1117,6 +1117,266 @@ button:active {
   background: rgba(255, 255, 255, 0.35);
 }
 
+/* ── Guide Modal ────────────────────────────────────────── */
+.guide-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 4, 10, 0.82);
+  backdrop-filter: blur(6px);
+  padding: 16px;
+}
+
+.guide-overlay.hidden {
+  display: none;
+}
+
+.guide-modal {
+  width: min(860px, 100%);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.06), transparent 40%),
+    linear-gradient(180deg, rgba(12, 17, 32, 0.98), rgba(8, 12, 24, 0.96));
+  border: 1px solid rgba(133, 216, 255, 0.28);
+  clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 28px 100%, 0 calc(100% - 28px));
+  box-shadow:
+    0 40px 100px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(133, 216, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: panel-rise 320ms ease both;
+}
+
+.guide-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid rgba(133, 216, 255, 0.14);
+  flex-shrink: 0;
+}
+
+.guide-header .title-kicker {
+  margin: 0;
+  font-size: 11px;
+}
+
+.guide-header h2 {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 28px);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex: 1;
+}
+
+.guide-close {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 16px;
+  clip-path: none;
+  border-radius: 0;
+  border-color: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+  animation: none;
+}
+
+.guide-body {
+  overflow-y: auto;
+  padding: 20px 24px 28px;
+  display: grid;
+  gap: 28px;
+}
+
+.guide-section-title {
+  margin: 0 0 14px;
+  font-size: 13px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(133, 216, 255, 0.14);
+}
+
+/* Steps */
+.guide-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.guide-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.guide-step.step-escape {
+  border-color: rgba(133, 216, 255, 0.2);
+  background: rgba(133, 216, 255, 0.05);
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(133, 216, 255, 0.15);
+  border: 1px solid rgba(133, 216, 255, 0.3);
+  color: var(--accent);
+}
+
+.guide-step strong {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 13px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.guide-step p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* Entities */
+.guide-entities {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.guide-entity {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.entity-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 2px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.guide-entity strong {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 3px;
+  letter-spacing: 0.04em;
+}
+
+.guide-entity p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* Objects */
+.guide-objects {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.guide-object {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.obj-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid;
+}
+
+.guide-object strong {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 3px;
+  letter-spacing: 0.04em;
+}
+
+.guide-object p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* Tips */
+.guide-tips {
+  display: grid;
+  gap: 10px;
+}
+
+.guide-tip {
+  padding: 12px 14px;
+  border-left: 3px solid;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.guide-tip.danger { border-color: var(--danger); background: rgba(255, 122, 122, 0.06); }
+.guide-tip.warn   { border-color: var(--gold);   background: rgba(255, 212, 109, 0.05); }
+.guide-tip.info   { border-color: var(--accent);  background: rgba(133, 216, 255, 0.05); }
+
+.guide-tip strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--text);
+}
+
+.guide-tip p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
 /* ── Keyframes ──────────────────────────────────────────── */
 @keyframes objectivePulse {
   0%, 100% { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
