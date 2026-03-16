@@ -3299,6 +3299,7 @@ function updateInfected(dt) {
 
     const ownedRoom = getOwnedRoom();
     const localOwnedRoom = ownedRoom && ownedRoom.floor === enemy.floor ? ownedRoom : null;
+    let attackedDoor = false;
     if (
       !profile.phasing &&
       localOwnedRoom &&
@@ -3306,6 +3307,7 @@ function updateInfected(dt) {
       !localOwnedRoom.door.broken &&
       distance(enemy, { x: localOwnedRoom.door.centerX, y: localOwnedRoom.door.centerY }) < 20
     ) {
+      attackedDoor = true;
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = profile.cooldown;
@@ -3324,7 +3326,7 @@ function updateInfected(dt) {
       enemy.attackCooldown = Math.max(0, enemy.attackCooldown - dt);
     }
 
-    if (game.player.spawnShield <= 0 && distance(enemy, game.player) < 18) {
+    if (!attackedDoor && game.player.spawnShield <= 0 && distance(enemy, game.player) < 18) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = profile.cooldown;
@@ -3760,6 +3762,7 @@ function resolveAnomaly(success) {
     playUiTone(150, 0.18, "sawtooth", 0.05);
   }
   game.anomaly = null;
+  game.nextAnomalyTimer = Math.max(game.nextAnomalyTimer, randomRange(34, 52));
 }
 
 function updateAnomaly(dt) {
@@ -3942,6 +3945,7 @@ function getNextWaypoint(fromX, fromY, targetX, targetY, floor) {
       break;
     }
     const currentNode = navGraph.find((node) => node.id === current);
+    if (!currentNode) { continue; }
     for (const linkId of currentNode.links) {
       if (visited.has(linkId)) {
         continue;
@@ -4227,6 +4231,7 @@ function drawZones() {
     ctx.fillText("ALTAR", room.altar.x - 14, room.altar.y - 16);
     ctx.fillStyle = "rgba(140, 240, 255, 0.55)";
     ctx.fillText("TERMINAL", room.terminal.x - 22, room.terminal.y - 16);
+    ctx.letterSpacing = "";
   }
 
   if (world.generatorRoom.floor === game.player.floor) {
