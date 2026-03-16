@@ -2371,7 +2371,7 @@ function useElevator(elevator) {
 }
 
 function escapeRun() {
-  if (world.exitRoom.gate.closed) {
+  if (game.phase !== "running" || world.exitRoom.gate.closed) {
     return;
   }
   resetTouchStick();
@@ -2681,7 +2681,9 @@ function updateHiders(dt) {
 }
 
 function updateBlackout(dt) {
-  game.blackoutTimer -= dt;
+  if (!game.blackoutActive) {
+    game.blackoutTimer -= dt;
+  }
 
   // Pre-warning: flicker and audio 18s before blackout
   if (!game.blackoutActive && !game.blackoutWarning && game.blackoutTimer <= 18 && game.blackoutTimer > 0) {
