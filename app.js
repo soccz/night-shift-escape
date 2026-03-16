@@ -367,7 +367,7 @@ const CONFIG = {
     defendDoorRange: 220,
   },
   hider: {
-    goldGainMultiplier: 0.58,
+    goldGainMultiplier: 0.68,
     decisionMin: 3.6,
     decisionMax: 6.4,
     baseUnitCap: 2,
@@ -1395,6 +1395,8 @@ function createGame() {
     wardEventTimer: randomRange(80, 130),
     wardEventFired: false,
     floatTexts: [],
+    _goldFloatTimer: 0,
+    _mutationWarned: false,
     runProfile,
     metaBonuses,
   };
@@ -1535,6 +1537,7 @@ function toggleLanguage() {
   saveLanguage(state.lang);
   applyStaticText();
   renderHud(true);
+  playUiTone(state.lang === "en" ? 520 : 480, 0.08, "triangle", 0.03);
 }
 
 function applyStaticText() {
@@ -1595,10 +1598,13 @@ performanceButton.addEventListener("click", () => {
   savePerformanceMode(state.lowFx);
   applyStaticText();
   renderHud(true);
+  pushLog(state.lowFx ? langText("간소화 모드 활성화.", "Lite FX enabled.") : langText("간소화 모드 비활성화.", "Lite FX disabled."));
+  playUiTone(state.lowFx ? 280 : 600, 0.08, "triangle", 0.03);
 });
 hudToggleButton.addEventListener("click", () => {
   state.sidebarCollapsed = !state.sidebarCollapsed;
   applyStaticText();
+  playUiTone(state.sidebarCollapsed ? 320 : 480, 0.06, "triangle", 0.025);
 });
 muteButton.addEventListener("click", toggleMute);
 pauseButton.addEventListener("click", () => {
@@ -1619,6 +1625,7 @@ dockModeButton.addEventListener("click", () => {
   state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
   state.clickTarget = null;
   pushLog(state.lang === "ko" ? `이동 방식: ${t(`movement_${state.movementMode}`)}` : `Movement mode: ${state.movementMode.toUpperCase()}`);
+  playUiTone(state.movementMode === "wasd" ? 540 : 380, 0.07, "triangle", 0.03);
 });
 dockInteractButton.addEventListener("click", () => {
   ensureAudio();
@@ -1663,6 +1670,7 @@ window.addEventListener("keydown", (event) => {
     state.movementMode = state.movementMode === "wasd" ? "click" : "wasd";
     state.clickTarget = null;
     pushLog(state.lang === "ko" ? `이동 방식: ${t(`movement_${state.movementMode}`)}` : `Movement mode: ${state.movementMode.toUpperCase()}`);
+    playUiTone(state.movementMode === "wasd" ? 540 : 380, 0.07, "triangle", 0.03);
     return;
   }
 
@@ -1877,7 +1885,12 @@ function triggerInteract() {
 }
 
 function performFieldMedic(room) {
-  if (game.gold < 60 || game.player.hp >= game.player.maxHp * 0.75) return;
+  if (game.player.hp >= game.player.maxHp * 0.75) return;
+  if (game.gold < 60) {
+    pushLog(langText("응급 치료비가 부족합니다 (60골드 필요).", "Not enough gold for field medic (60g needed)."));
+    playUiTone(220, 0.06, "sawtooth", 0.025);
+    return;
+  }
   addGold(-60);
   const healAmt = Math.min(game.player.maxHp - game.player.hp, 30);
   game.player.hp = Math.min(game.player.maxHp, game.player.hp + healAmt);
@@ -1888,7 +1901,12 @@ function performFieldMedic(room) {
 }
 
 function performBreachSeal(room) {
-  if (game.gold < 90 || !room.breach) return;
+  if (!room.breach) return;
+  if (game.gold < 90) {
+    pushLog(langText("균열 봉쇄 비용이 부족합니다 (90골드 필요).", "Not enough gold to seal breach (90g needed)."));
+    playUiTone(220, 0.06, "sawtooth", 0.025);
+    return;
+  }
   addGold(-90);
   room.breach = false;
   room.breachTimer = 18;
@@ -2017,6 +2035,7 @@ function toggleDoor(room) {
   }
   room.door.closed = !room.door.closed;
   pushLog(room.door.closed ? langText("문을 봉쇄했습니다.", "Door sealed.") : langText("문을 열었습니다.", "Door opened."));
+  playUiTone(room.door.closed ? 440 : 320, 0.06, "triangle", 0.03);
 }
 
 function performSummon(room) {
@@ -2289,7 +2308,7 @@ function getPrompt() {
   }
 
   if (room && !room.owner) {
-    return { type: "claim", room, text: t("prompt_claim") };
+    return { type: "claim", room, text: langText("E: 방 점거 (골드 생산, 경보 상승)", "E: Claim room (gold income, raises alert)") };
   }
 
   if (localOwnedRoom && distance(player, localOwnedRoom.altar) < 42) {
@@ -2305,7 +2324,7 @@ function getPrompt() {
     if (localOwnedRoom.breach && game.gold >= 90) {
       return { type: "breach_seal", room: localOwnedRoom, text: langText("E: 균열 봉쇄 (90골드)", "E: Seal Breach (90g)") };
     }
-    return { type: "intel", room: localOwnedRoom, text: t("prompt_intel") };
+    return { type: "intel", room: localOwnedRoom, text: langText(`E: 정보 구매 (${getIntelCost()}골드)`, `E: Buy intel (${getIntelCost()}g)`) };
   }
 
   if (localOwnedRoom && distance(player, { x: localOwnedRoom.door.centerX, y: localOwnedRoom.door.centerY }) < 42) {
@@ -2731,8 +2750,15 @@ function updateMutation(dt) {
     game.mutationClock = Math.max(0, game.mutationClock - dt * 2);
   }
 
-  if (!ownedRoom.breach && game.mutationClock > CONFIG.mutation.triggerClock * game.runProfile.modifiers.mutationThresholdMultiplier) {
+  const mutationThreshold = CONFIG.mutation.triggerClock * game.runProfile.modifiers.mutationThresholdMultiplier;
+  if (!ownedRoom.breach && !game._mutationWarned && game.mutationClock > mutationThreshold * 0.75) {
+    game._mutationWarned = true;
+    pushLog(langText("방이 불안정합니다. 균열이 곧 열릴 것 같습니다...", "The room feels unstable. A breach is imminent..."));
+    playUiTone(260, 0.1, "sawtooth", 0.03);
+  }
+  if (!ownedRoom.breach && game.mutationClock > mutationThreshold) {
     ownedRoom.breach = true;
+    game._mutationWarned = false;
     ownedRoom.aggro += 24;
     pushLog(langText("방이 찢어졌습니다. 무언가 옆길을 찾았습니다.", "The room split open. Something found a side path."));
     pulseShake(1.6);
@@ -2834,7 +2860,7 @@ function updateHunter(dt) {
     moveEntityWithPath(hunter, hunter.targetX, hunter.targetY, CONFIG.hunter.baseSpeed * 0.4 * dt);
     return;
   }
-  hunter.level = Math.min(20, 1 + Math.floor(game.time / 55) + Math.floor(game.fragments / 2) + countBreaches());
+  hunter.level = Math.min(20, 1 + Math.floor(game.time / 70) + Math.floor(game.fragments / 2) + countBreaches());
 
   // Announce hunter phase milestones
   if (hunter.level === 3 && !hunter._announcedL3) {
@@ -2860,7 +2886,7 @@ function updateHunter(dt) {
     if (hunter._breachAttemptTimer <= 0) {
       hunter._breachAttemptTimer = randomRange(35, 55);
       const ownedRoom = getOwnedRoom();
-      if (ownedRoom && !ownedRoom.breach && hunter.floor === ownedRoom.floor && Math.random() < 0.4) {
+      if (ownedRoom && !ownedRoom.breach && hunter.floor === ownedRoom.floor && ownedRoom.door.hp < ownedRoom.door.maxHp * 0.5 && Math.random() < 0.4) {
         ownedRoom.breach = true;
         pushLog(langText("술래가 벽을 뚫었습니다!", "The hunter forced a breach!"));
         pulseShake(2.0);
@@ -2916,6 +2942,7 @@ function updateHunter(dt) {
   if (hunter.skillCooldown <= 0) {
     castHunterSkill();
     const skillProfile = HUNTER_SKILLS[game.runProfile.hunter.id];
+    if (!skillProfile) { hunter.skillCooldown = 15; return; }
     hunter.skillCooldown = randomRange(skillProfile.cooldownMin, skillProfile.cooldownMax);
   }
 
@@ -3073,7 +3100,7 @@ function updateHunterMode(dt) {
   } else if (hunter.floor === game.player.floor) {
     // Level 3+ patrols more aggressively between rooms
     const rushThreshold = hunter.level >= 3 ? 200 : 150;
-    nextMode = distance(hunter, game.player) < rushThreshold || game.blackoutActive ? "rush" : (hunter.level >= 3 ? "rush" : "stalk");
+    nextMode = distance(hunter, game.player) < rushThreshold || game.blackoutActive ? "rush" : "stalk";
   }
 
   if (hunter.mode !== nextMode) {
@@ -3202,10 +3229,17 @@ function handleHunterDoorDamage() {
     (game.floorHazards.powerSurge > 0 && game.hunter.floor === "f1" ? 1.24 : 1) *
     game.runProfile.modifiers.hunterDoorDamageMultiplier *
     game.runProfile.modifiers.hunterDamageMultiplier;
+  const prevHpPct = room.door.hp / room.door.maxHp;
   room.door.hp -= damage;
+  const newHpPct = room.door.hp / room.door.maxHp;
+  if (room.owner === "player" && prevHpPct >= 0.4 && newHpPct < 0.4) {
+    pushLog(langText("문이 무너지기 직전입니다! 지금 강화하세요!", "Your door is about to collapse! Reinforce now!"));
+    flashScreen("rgba(255, 60, 60, 0.18)", 0.36, 0.15);
+    playUiTone(320, 0.1, "sawtooth", 0.04);
+  }
   spawnImpact(room.door.centerX, room.door.centerY, "crimson", 1.05, 12);
   if (room.door.thorns) {
-    game.hunter.hp = (game.hunter.hp || hunterMaxHp()) - 8;
+    game.hunter.hp -= 8;
     spawnImpact(game.hunter.x, game.hunter.y, "gold", 0.8, 8);
   }
   if (room.door.hp <= 0) {
@@ -4139,11 +4173,12 @@ function drawZones() {
       });
     } else if (isClaimable) {
       // 점거 가능: 점선 테두리
+      ctx.save();
       ctx.setLineDash([8, 6]);
       ctx.strokeStyle = `rgba(255, 212, 80, ${0.5 + Math.sin(game.time * 3) * 0.2})`;
       ctx.lineWidth = 2.5;
       ctx.strokeRect(room.x + 3, room.y + 3, room.w - 6, room.h - 6);
-      ctx.setLineDash([]);
+      ctx.restore();
     }
 
     if (room.breach) {
@@ -4242,6 +4277,18 @@ function drawZones() {
     drawWorldLabel(nearbyPrompt.room.altar.x, nearbyPrompt.room.altar.y - 32, langText("제단: E 응급 치료 (60골드)", "Altar: E field medic (60g)"), "rgba(255, 230, 100, 0.95)");
   } else if (nearbyPrompt?.type === "breach_seal") {
     drawWorldLabel(nearbyPrompt.room.terminal.x, nearbyPrompt.room.terminal.y - 32, langText("단말: E 균열 봉쇄 (90골드)", "Terminal: E seal breach (90g)"), "rgba(143, 255, 220, 0.95)");
+  }
+
+  // Generator repair progress bar
+  if (game.player.holdingRepair > 0 && nearbyPrompt?.type === "generator") {
+    const repairDuration = 2.2 * game.runProfile.modifiers.repairDurationMultiplier;
+    const pct = Math.min(1, game.player.holdingRepair / repairDuration);
+    const barX = world.generator.x - 30;
+    const barY = world.generator.y - 22;
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(barX, barY, 60, 6);
+    ctx.fillStyle = `rgba(255, 232, 141, ${0.7 + pct * 0.3})`;
+    ctx.fillRect(barX, barY, 60 * pct, 6);
   }
 
   // Escape progress bar
@@ -4540,9 +4587,9 @@ function drawDoors() {
     }
     if (room.owner) {
       ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-      ctx.fillRect(room.door.x, room.door.y - 10, room.door.w, 4);
+      ctx.fillRect(room.door.x, room.door.y - 12, room.door.w, 6);
       ctx.fillStyle = room.door.curse ? "#ff77a8" : "#8fe9c7";
-      ctx.fillRect(room.door.x, room.door.y - 10, room.door.w * hpPct, 4);
+      ctx.fillRect(room.door.x, room.door.y - 12, room.door.w * hpPct, 6);
     }
     ctx.restore();
 
@@ -4576,8 +4623,22 @@ function drawDoors() {
   }
 
   if (world.exitRoom.floor === game.player.floor) {
-    ctx.fillStyle = world.exitRoom.gate.closed ? "#634646" : "#3d6e63";
-    ctx.fillRect(world.exitRoom.gate.x, world.exitRoom.gate.y, world.exitRoom.gate.w, world.exitRoom.gate.h);
+    const gate = world.exitRoom.gate;
+    if (gate.closed) {
+      ctx.fillStyle = "#634646";
+      ctx.fillRect(gate.x, gate.y, gate.w, gate.h);
+    } else {
+      const openPulse = 0.72 + Math.sin(game.time * 2.6) * 0.18;
+      ctx.save();
+      ctx.shadowColor = "#3dffce";
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = `rgba(61, 110, 99, ${openPulse})`;
+      ctx.fillRect(gate.x, gate.y, gate.w, gate.h);
+      ctx.strokeStyle = `rgba(80, 230, 180, ${openPulse * 0.8})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(gate.x - 1, gate.y - 1, gate.w + 2, gate.h + 2);
+      ctx.restore();
+    }
   }
 }
 
@@ -4870,12 +4931,13 @@ function drawCelOrb(x, y, radius, fill, rim, glow) {
   ctx.lineWidth = 3;
   ctx.stroke();
 
+  ctx.save();
   ctx.beginPath();
   ctx.arc(x - radius * 0.22, y - radius * 0.25, radius * 0.42, 0, Math.PI * 2);
   ctx.fillStyle = rim;
   ctx.globalAlpha = 0.34;
   ctx.fill();
-  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 function drawCharacter(entity, kind) {
@@ -4935,6 +4997,13 @@ function drawCharacter(entity, kind) {
     if (game.hunter.charging) {
       const chargeProgress = 1 - game.hunter.chargeTimer / 0.45;
       const ringR = radius + 8 + chargeProgress * 22;
+      // Outer glow ring
+      ctx.strokeStyle = `rgba(255, 40, 80, ${(0.9 - chargeProgress * 0.4) * 0.38})`;
+      ctx.lineWidth = 9;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+      // Inner crisp ring
       ctx.strokeStyle = `rgba(255, 40, 80, ${0.9 - chargeProgress * 0.4})`;
       ctx.lineWidth = 3.5;
       ctx.beginPath();
