@@ -187,11 +187,16 @@ button {
 }
 
 button:hover {
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.03);
   border-color: rgba(255, 127, 164, 0.45);
   box-shadow:
     0 18px 44px rgba(0, 0, 0, 0.34),
     0 0 22px rgba(255, 103, 150, 0.18);
+}
+
+button:active {
+  transform: translateY(0) scale(0.97);
+  transition: transform 80ms ease;
 }
 
 .layout {
@@ -259,8 +264,9 @@ button:hover {
   backdrop-filter: blur(12px);
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
   box-shadow:
-    0 18px 44px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 20px rgba(0, 0, 0, 0.5),
+    0 18px 44px rgba(0, 0, 0, 0.32);
 }
 
 .hud-panel h2 {
@@ -669,7 +675,7 @@ button:hover {
 .stat-row span {
   color: var(--muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   font-size: 11px;
 }
 
@@ -684,6 +690,8 @@ button:hover {
 
 .stat-row strong.danger {
   color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .meta-tree-summary {
@@ -1045,4 +1053,81 @@ button:hover {
     padding: 12px 12px;
     font-size: 12px;
   }
+}
+
+/* ── Log entry type accents ─────────────────────────────── */
+.log-entry.danger {
+  border-left: 2px solid rgba(255, 122, 122, 0.55);
+  padding-left: 8px;
+}
+
+.log-entry.gold {
+  border-left: 2px solid rgba(255, 212, 109, 0.55);
+  padding-left: 8px;
+}
+
+.log-entry.info {
+  border-left: 2px solid rgba(255, 255, 255, 0.18);
+  padding-left: 8px;
+}
+
+.hud-panel-log {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 18%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 18%);
+}
+
+/* ── Objective card pulse ───────────────────────────────── */
+.overlay-card {
+  animation: objectivePulse 2.6s ease-in-out infinite;
+}
+
+/* ── Admin active indicator ─────────────────────────────── */
+.admin-active {
+  animation: adminPulse 1.5s ease-in-out infinite !important;
+  border-color: rgba(255, 212, 109, 0.6) !important;
+}
+
+/* ── Damage flash overlay ───────────────────────────────── */
+.damage-flash::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  animation: damageFlash 0.4s ease-out forwards;
+  background: radial-gradient(circle at center, transparent 40%, rgba(255, 30, 60, 0.38) 100%);
+  z-index: 999;
+}
+
+/* ── Scrollbar styling ──────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ── Keyframes ──────────────────────────────────────────── */
+@keyframes objectivePulse {
+  0%, 100% { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+  50%       { box-shadow: 0 18px 40px rgba(0, 0, 0, 0.3), 0 0 18px rgba(133, 216, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+}
+
+@keyframes adminPulse {
+  0%, 100% { background-color: rgba(255, 212, 109, 0.06); box-shadow: 0 0 12px rgba(255, 212, 109, 0.15); }
+  50%       { background-color: rgba(255, 212, 109, 0.14); box-shadow: 0 0 28px rgba(255, 212, 109, 0.32); }
+}
+
+@keyframes damageFlash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
 }

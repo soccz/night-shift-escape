@@ -48,6 +48,31 @@ const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 const STAGE_RATIO = WIDTH / HEIGHT;
 
+// Pre-rendered backdrop cache — gradients are static, no need to recreate each frame
+const _backdropCache = (() => {
+  const offscreen = document.createElement("canvas");
+  offscreen.width = WIDTH;
+  offscreen.height = HEIGHT;
+  const octx = offscreen.getContext("2d", { alpha: false });
+  const g = octx.createLinearGradient(0, 0, WIDTH, HEIGHT);
+  g.addColorStop(0, "#140d1c");
+  g.addColorStop(0.45, "#08111d");
+  g.addColorStop(1, "#04070c");
+  octx.fillStyle = g;
+  octx.fillRect(0, 0, WIDTH, HEIGHT);
+  const bloom = octx.createRadialGradient(WIDTH * 0.74, HEIGHT * 0.1, 20, WIDTH * 0.74, HEIGHT * 0.1, 340);
+  bloom.addColorStop(0, "rgba(255, 74, 126, 0.2)");
+  bloom.addColorStop(1, "rgba(255, 74, 126, 0)");
+  octx.fillStyle = bloom;
+  octx.fillRect(0, 0, WIDTH, HEIGHT);
+  const blueBloom = octx.createRadialGradient(WIDTH * 0.2, HEIGHT * 0.85, 20, WIDTH * 0.2, HEIGHT * 0.85, 420);
+  blueBloom.addColorStop(0, "rgba(91, 186, 255, 0.16)");
+  blueBloom.addColorStop(1, "rgba(91, 186, 255, 0)");
+  octx.fillStyle = blueBloom;
+  octx.fillRect(0, 0, WIDTH, HEIGHT);
+  return offscreen;
+})();
+
 const I18N = {
   ko: {
     subtitle: "브라우저용 애니 호러 솔로 디펜스 런.",
@@ -88,8 +113,12 @@ const I18N = {
       ["문 강화", "R"],
       ["이동 방식 전환", "Tab"],
       ["일시정지", "Esc / P"],
-      ["운영자 모드", "Q"],
+      ["운영자 모드", "F1 / Q"],
       ["운영자 자금", "Insert"],
+      ["갓 모드 (운영자)", "G"],
+      ["헌터 처치 (운영자)", "K"],
+      ["조각 수집 (운영자)", "F"],
+      ["즉시 정전 (운영자)", "N"],
     ],
     stat_health: "체력",
     stat_gold: "골드",
@@ -181,8 +210,12 @@ const I18N = {
       ["Reinforce door", "R"],
       ["Toggle movement mode", "Tab"],
       ["Pause", "Esc / P"],
-      ["Admin mode", "Q"],
+      ["Admin mode", "F1 / Q"],
       ["Admin money", "Insert"],
+      ["God mode (admin)", "G"],
+      ["Kill hunter (admin)", "K"],
+      ["Collect all (admin)", "F"],
+      ["Blackout now (admin)", "N"],
     ],
     stat_health: "Health",
     stat_gold: "Gold",
@@ -649,6 +682,7 @@ const state = {
   meta: loadMeta(),
   nextUnitId: 1,
   adminMode: false,
+  godMode: false,
   paused: false,
   sidebarCollapsed: window.matchMedia && window.matchMedia("(max-width: 1120px)").matches,
   lowFx: loadPerformanceMode(),
@@ -1353,6 +1387,13 @@ function setPaused(nextPaused) {
   }
   pauseOverlay.classList.toggle("hidden", !state.paused);
   pauseButton.textContent = state.paused ? t("resume") : t("pause");
+  if (state.paused && game && game.phase === "running") {
+    const elapsed = formatTime(game.time);
+    const ownedRoom = getOwnedRoom ? getOwnedRoom() : null;
+    pauseCopy.innerHTML = state.lang === "ko"
+      ? `경과 시간: <strong>${elapsed}</strong> &nbsp;|&nbsp; 체력: <strong>${Math.ceil(game.player.hp)} / ${game.player.maxHp}</strong> &nbsp;|&nbsp; 조각: <strong>${game.fragments} / 6</strong> &nbsp;|&nbsp; 골드: <strong>${Math.floor(game.gold)}</strong>`
+      : `Time: <strong>${elapsed}</strong> &nbsp;|&nbsp; HP: <strong>${Math.ceil(game.player.hp)} / ${game.player.maxHp}</strong> &nbsp;|&nbsp; Fragments: <strong>${game.fragments} / 6</strong> &nbsp;|&nbsp; Gold: <strong>${Math.floor(game.gold)}</strong>`;
+  }
   applyStaticText();
 }
 
@@ -1561,9 +1602,10 @@ window.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (code === CONFIG.admin.toggleCode) {
+  if (code === CONFIG.admin.toggleCode || event.key === "F1") {
     event.preventDefault();
     state.adminMode = !state.adminMode;
+    if (!state.adminMode) state.godMode = false;
     pushLog(state.lang === "ko" ? `운영자 모드 ${state.adminMode ? "활성화" : "비활성화"}.` : `Admin mode ${state.adminMode ? "enabled" : "disabled"}.`);
     playUiTone(state.adminMode ? 680 : 280, 0.08, "triangle", 0.035);
     return;
@@ -1579,6 +1621,42 @@ window.addEventListener("keydown", (event) => {
       playUiTone(200, 0.08, "sawtooth", 0.03);
     }
     return;
+  }
+
+  if (state.adminMode && !state.titleVisible && game) {
+    if (key === "g") {
+      event.preventDefault();
+      state.godMode = !state.godMode;
+      pushLog(state.lang === "ko" ? `갓 모드 ${state.godMode ? "ON" : "OFF"}.` : `God mode ${state.godMode ? "ON" : "OFF"}.`);
+      playUiTone(state.godMode ? 760 : 320, 0.1, "triangle", 0.04);
+      return;
+    }
+    if (key === "k") {
+      event.preventDefault();
+      if (game.hunter) {
+        game.hunter.hp = 0;
+        pushLog(state.lang === "ko" ? "운영자: 헌터 강제 처치." : "Admin: Hunter force-killed.");
+        playUiTone(260, 0.12, "sawtooth", 0.04);
+      }
+      return;
+    }
+    if (key === "f") {
+      event.preventDefault();
+      game.fragments = CONFIG.intel.maxFragments;
+      for (const kc of world.keycards) { kc.visible = true; kc.collected = true; }
+      game.keycardsCollected = world.keycards.length;
+      refreshUnlockProgress();
+      pushLog(state.lang === "ko" ? "운영자: 조각·시질 전부 수집." : "Admin: All fragments & sigils collected.");
+      playUiTone(600, 0.12, "triangle", 0.05);
+      return;
+    }
+    if (key === "n") {
+      event.preventDefault();
+      game.blackoutTimer = 0;
+      pushLog(state.lang === "ko" ? "운영자: 즉시 정전 유발." : "Admin: Blackout triggered.");
+      playUiTone(180, 0.1, "sawtooth", 0.04);
+      return;
+    }
   }
 
   if (key === "e" || code === "KeyE" || code === "Enter") {
@@ -2865,11 +2943,13 @@ function handleHunterAttacks() {
   if (game.hunter.floor === game.player.floor && distance(game.hunter, game.player) < 24 && game.hunter.attackCooldown <= 0) {
     const mode = hunterModeProfile();
     game.hunter.attackCooldown = 0.65 * mode.cooldown;
-    game.player.hp -=
-      (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) *
-      mode.damage *
-      game.runProfile.modifiers.hunterPlayerDamageMultiplier *
-      game.runProfile.modifiers.hunterDamageMultiplier;
+    if (!state.godMode) {
+      game.player.hp -=
+        (CONFIG.hunter.basePlayerDamage + game.hunter.level * CONFIG.hunter.playerDamagePerLevel) *
+        mode.damage *
+        game.runProfile.modifiers.hunterPlayerDamageMultiplier *
+        game.runProfile.modifiers.hunterDamageMultiplier;
+    }
     game.player.lastDamageSource = "hunter";
     pulseShake(1.25);
     playUiTone(150, 0.08, "square", 0.04);
@@ -2935,7 +3015,9 @@ function updateInfected(dt) {
       enemy.attackCooldown -= dt;
       if (enemy.attackCooldown <= 0) {
         enemy.attackCooldown = profile.cooldown;
-        game.player.hp -= CONFIG.infected.playerDamage * profile.playerDamageMultiplier * game.runProfile.modifiers.infectedDamageMultiplier;
+        if (!state.godMode) {
+          game.player.hp -= CONFIG.infected.playerDamage * profile.playerDamageMultiplier * game.runProfile.modifiers.infectedDamageMultiplier;
+        }
         game.player.lastDamageSource = "infected";
         pulseShake(0.9);
         playUiTone(180, 0.06, "square", 0.03);
@@ -3617,40 +3699,7 @@ function draw() {
 }
 
 function drawBackdrop() {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  const gradient = ctx.createLinearGradient(0, 0, WIDTH, HEIGHT);
-  gradient.addColorStop(0, "#140d1c");
-  gradient.addColorStop(0.45, "#08111d");
-  gradient.addColorStop(1, "#04070c");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  const bloom = ctx.createRadialGradient(
-    WIDTH * 0.74,
-    HEIGHT * 0.1,
-    20,
-    WIDTH * 0.74,
-    HEIGHT * 0.1,
-    340,
-  );
-  bloom.addColorStop(0, "rgba(255, 74, 126, 0.2)");
-  bloom.addColorStop(1, "rgba(255, 74, 126, 0)");
-  ctx.fillStyle = bloom;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  const blueBloom = ctx.createRadialGradient(
-    WIDTH * 0.2,
-    HEIGHT * 0.85,
-    20,
-    WIDTH * 0.2,
-    HEIGHT * 0.85,
-    420,
-  );
-  blueBloom.addColorStop(0, "rgba(91, 186, 255, 0.16)");
-  blueBloom.addColorStop(1, "rgba(91, 186, 255, 0)");
-  ctx.fillStyle = blueBloom;
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-
+  ctx.drawImage(_backdropCache, 0, 0);
   if (!state.lowFx && state.runtime.danger > 0.18) {
     drawSpeedLines(state.runtime.danger * 0.14);
   }
@@ -4070,29 +4119,30 @@ function drawLighting() {
   const danger = state.runtime.danger;
   if (state.lowFx) {
     ctx.save();
-    const alpha = game.blackoutActive ? 0.78 : 0.62 + danger * 0.08;
+    const alpha = game.blackoutActive ? 0.76 : 0.44 + danger * 0.1;
     ctx.fillStyle = `rgba(3, 5, 11, ${alpha})`;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
     ctx.globalCompositeOperation = "destination-out";
     const screenPlayer = worldToScreen(game.player);
     ctx.beginPath();
-    ctx.arc(screenPlayer.x, screenPlayer.y, 150, 0, Math.PI * 2);
+    ctx.arc(screenPlayer.x, screenPlayer.y, 200, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     return;
   }
   ctx.save();
-  const flicker = game.blackoutActive ? 0.06 + Math.sin(game.time * 17) * 0.03 : Math.sin(game.time * 4.2) * 0.012;
+  const flicker = game.blackoutActive ? 0.06 + Math.sin(game.time * 17) * 0.03 : Math.sin(game.time * 4.2) * 0.01;
   ctx.fillStyle = game.blackoutActive
-    ? `rgba(3, 4, 10, ${0.82 + danger * 0.08 + flicker})`
-    : `rgba(2, 4, 9, ${0.68 + danger * 0.06 + flicker})`;
+    ? `rgba(3, 4, 10, ${0.80 + danger * 0.08 + flicker})`
+    : `rgba(2, 4, 9, ${0.50 + danger * 0.08 + flicker})`;
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
   ctx.globalCompositeOperation = "destination-out";
 
   const screenPlayer = worldToScreen(game.player);
-  const playerLightRadius = 168 + Math.sin(game.time * 5.4) * 6;
-  const playerLight = ctx.createRadialGradient(screenPlayer.x, screenPlayer.y, 24, screenPlayer.x, screenPlayer.y, playerLightRadius);
-  playerLight.addColorStop(0, "rgba(0, 0, 0, 0.92)");
+  const playerLightRadius = 230 + Math.sin(game.time * 5.4) * 8;
+  const playerLight = ctx.createRadialGradient(screenPlayer.x, screenPlayer.y, 0, screenPlayer.x, screenPlayer.y, playerLightRadius);
+  playerLight.addColorStop(0, "rgba(0, 0, 0, 1)");
+  playerLight.addColorStop(0.55, "rgba(0, 0, 0, 0.88)");
   playerLight.addColorStop(1, "rgba(0, 0, 0, 0)");
   ctx.fillStyle = playerLight;
   ctx.beginPath();
@@ -4103,19 +4153,21 @@ function drawLighting() {
     const ownedRoom = state.runtime.ownedRoom;
     if (ownedRoom && ownedRoom.floor === game.player.floor) {
       const roomCenter = worldToScreen({ x: ownedRoom.x + ownedRoom.w / 2, y: ownedRoom.y + ownedRoom.h / 2 });
+      const roomRadius = 200 + Math.sin(game.time * 2.5) * 8;
       const roomLight = ctx.createRadialGradient(
         roomCenter.x,
         roomCenter.y,
-        50,
+        30,
         roomCenter.x,
         roomCenter.y,
-        150 + Math.sin(game.time * 2.5) * 5,
+        roomRadius,
       );
-      roomLight.addColorStop(0, "rgba(0, 0, 0, 0.4)");
+      roomLight.addColorStop(0, "rgba(0, 0, 0, 0.72)");
+      roomLight.addColorStop(0.6, "rgba(0, 0, 0, 0.45)");
       roomLight.addColorStop(1, "rgba(0, 0, 0, 0)");
       ctx.fillStyle = roomLight;
       ctx.beginPath();
-      ctx.arc(roomCenter.x, roomCenter.y, 150, 0, Math.PI * 2);
+      ctx.arc(roomCenter.x, roomCenter.y, roomRadius, 0, Math.PI * 2);
       ctx.fill();
     }
   }
@@ -4310,7 +4362,7 @@ function drawCelOrb(x, y, radius, fill, rim, glow) {
 function drawCharacter(entity, kind) {
   const infectedType = kind === "infected" ? entity.type || "infected" : null;
   const palette = {
-    player: { fill: colors.player, rim: "#ffffff", glow: 0.16, accent: "#85d8ff" },
+    player: { fill: colors.player, rim: "#ffffff", glow: 0.28, accent: "#85d8ff" },
     hunter: { fill: colors.hunter, rim: "#ffd0d8", glow: 0.3, accent: "#ff6f95" },
     hider: { fill: colors.hider, rim: "#ffffff", glow: 0.12, accent: "#85d8ff" },
     infected:
@@ -4338,12 +4390,12 @@ function drawCharacter(entity, kind) {
 
   if (kind === "player") {
     ctx.save();
-    ctx.strokeStyle = "rgba(133, 216, 255, 0.95)";
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = "rgba(133, 216, 255, 1)";
+    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.arc(drawX, drawY, radius + 12 + Math.sin(game.time * 3.8) * 1.8, 0, Math.PI * 2);
+    ctx.arc(drawX, drawY, radius + 13 + Math.sin(game.time * 3.8) * 1.8, 0, Math.PI * 2);
     ctx.stroke();
-    drawPulseRing(drawX, drawY, radius + 18 + Math.sin(game.time * 4.8) * 2, "rgba(133, 216, 255, 0.16)");
+    drawPulseRing(drawX, drawY, radius + 22 + Math.sin(game.time * 4.8) * 2, "rgba(133, 216, 255, 0.28)");
     if (entity.spawnShield > 0) {
       drawPulseRing(drawX, drawY, radius + 24 + Math.sin(game.time * 7.2) * 2, "rgba(255, 221, 111, 0.18)");
     }
@@ -4823,7 +4875,7 @@ function renderHud(force = false) {
     [t("stat_contract"), formatContractStatus(), game.contract ? "gold" : ""],
     [t("stat_anomaly"), formatAnomalyStatus(), game.anomaly ? "danger" : ""],
     [t("stat_hunter"), localize(game.runProfile.hunter.label), "danger"],
-    [t("stat_admin"), state.adminMode ? "ON" : "OFF", state.adminMode ? "gold" : ""],
+    [t("stat_admin"), state.adminMode ? (state.godMode ? "GOD" : "ON") : "OFF", state.adminMode ? "gold admin-active" : ""],
   ];
 
   const statsHtml = `
@@ -4945,7 +4997,7 @@ function renderHud(force = false) {
     .reverse()
     .map(
       (entry) =>
-        `<div class="log-entry"><span class="log-time">${entry.time}</span><span>${entry.text}</span></div>`,
+        `<div class="log-entry${entry.type ? ` ${entry.type}` : ""}"><span class="log-time">${entry.time}</span><span>${entry.text}</span></div>`,
     )
     .join("");
   if (logHtml !== state.hudCache.log) {
@@ -4954,12 +5006,19 @@ function renderHud(force = false) {
   }
 }
 
-function pushLog(text) {
-  state.logs.push({ time: formatTime(game.time), text });
+function pushLog(text, type) {
+  state.logs.push({ time: formatTime(game.time), text, type: type || inferLogType(text) });
   if (state.logs.length > 48) {
     state.logs.splice(0, state.logs.length - 48);
   }
   renderHud(true);
+}
+
+function inferLogType(text) {
+  const t = text.toLowerCase();
+  if (t.includes("데미지") || t.includes("damage") || t.includes("정전") || t.includes("blackout") || t.includes("침입") || t.includes("breach") || t.includes("사망") || t.includes("dead") || t.includes("처치") || t.includes("kill")) return "danger";
+  if (t.includes("골드") || t.includes("gold") || t.includes("조각") || t.includes("fragment") || t.includes("시질") || t.includes("sigil") || t.includes("탈출") || t.includes("escape") || t.includes("수집") || t.includes("recover")) return "gold";
+  return "info";
 }
 
 function formatIncomeStatus(ownedRoom) {

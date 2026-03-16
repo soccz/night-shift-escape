@@ -29,8 +29,12 @@ Then open `http://localhost:8000`.
 - `Tab`: toggle keyboard / click-to-move
 - `E`: context interact
 - `R`: reinforce your room door
-- `F1`: toggle admin mode
-- `Insert`: add gold when admin mode is on
+- `F1` or `Q`: toggle admin mode
+- `Insert`: add gold (admin mode)
+- `G`: toggle god mode — no damage (admin mode)
+- `K`: force-kill hunter (admin mode)
+- `F`: collect all fragments & sigils (admin mode)
+- `N`: trigger blackout immediately (admin mode)
 
 ## Vercel
 

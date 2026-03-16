@@ -15,13 +15,13 @@
           <p class="subtitle" id="subtitleText">브라우저용 애니 호러 솔로 디펜스 런.</p>
         </div>
         <div class="header-actions">
-          <button id="languageButton" type="button">KO</button>
+          <button id="languageButton" type="button" aria-label="언어 전환">KO</button>
           <div class="theme-chip" id="themeChip">Cel Horror HUD</div>
-          <button id="performanceButton" type="button">간소화</button>
-          <button id="hudToggleButton" type="button">HUD</button>
-          <button id="muteButton" type="button">사운드</button>
-          <button id="pauseButton" type="button">일시정지</button>
-          <button id="restartButton" type="button">다시 시작</button>
+          <button id="performanceButton" type="button" aria-label="성능 모드 전환">간소화</button>
+          <button id="hudToggleButton" type="button" aria-label="HUD 표시 전환">HUD</button>
+          <button id="muteButton" type="button" aria-label="사운드 켜기/끄기">사운드</button>
+          <button id="pauseButton" type="button" aria-label="일시정지">일시정지</button>
+          <button id="restartButton" type="button" aria-label="게임 다시 시작">다시 시작</button>
         </div>
       </header>
 
@@ -29,7 +29,7 @@
         <section class="viewport">
           <div class="stage" id="gameStage">
             <div class="alarm-strip" id="alarmStrip">구역 상태 불안정. 확률이 곧 법칙이다.</div>
-            <canvas id="gameCanvas" width="1360" height="820"></canvas>
+            <canvas id="gameCanvas" width="1360" height="820" role="img" aria-label="Night Shift Escape 게임 화면"></canvas>
             <div class="title-overlay" id="titleOverlay">
               <div class="title-card">
                 <p class="title-kicker" id="titleKicker">Night Protocol</p>
