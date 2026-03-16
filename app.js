@@ -2531,7 +2531,7 @@ function updatePlayer(dt) {
     player.speed = CONFIG.player.speed;
   }
 
-  if (game.blackoutActive && distance(player, world.generator) < 46 && isActionPressed("interact")) {
+  if (game.blackoutActive && world.generatorRoom.floor === player.floor && distance(player, world.generator) < 46 && isActionPressed("interact")) {
     player.holdingRepair += dt;
     if (player.holdingRepair >= 2.2 * game.runProfile.modifiers.repairDurationMultiplier) {
       repairGenerator();
