@@ -304,12 +304,12 @@ const CONFIG = {
   },
   economy: {
     startingGold: 85,
-    goldPerSecondInRoom: 5,
+    goldPerSecondInRoom: 7,
     goldPerSecondOnBedBonus: 7,
   },
   summon: {
     baseCost: 60,
-    slotCostStep: 18,
+    slotCostStep: 10,
     playerWeights: {
       sentinel: 38,
       rover: 30,
@@ -326,7 +326,7 @@ const CONFIG = {
   intel: {
     baseCost: 80,
     fragmentCostStep: 18,
-    timeInflation: 0.45,
+    timeInflation: 0.25,
     fragmentChance: 0.5,
     radarChance: 0.72,
     failChance: 0.92,
@@ -348,7 +348,7 @@ const CONFIG = {
   },
   mutation: {
     triggerClock: 40,
-    maxPressureBonus: 2,
+    maxPressureBonus: 1,
     goldPressureDivisor: 300,
   },
   hunter: {
@@ -1304,6 +1304,10 @@ function createGame() {
     wakeDelay: 4.5,
     charging: false,
     chargeTimer: 0,
+    _announcedL3: false,
+    _announcedL5: false,
+    _announcedL8: false,
+    _breachAttemptTimer: randomRange(35, 55),
     skillCooldown: randomRange(
       HUNTER_SKILLS[runProfile.hunter.id].cooldownMin,
       HUNTER_SKILLS[runProfile.hunter.id].cooldownMax,
@@ -1389,6 +1393,8 @@ function createGame() {
     blackoutWarning: false,
     wardEvent: null,
     wardEventTimer: randomRange(80, 130),
+    wardEventFired: false,
+    floatTexts: [],
     runProfile,
     metaBonuses,
   };
@@ -1518,6 +1524,10 @@ function startRun() {
     1.8,
   );
   flashScreen("rgba(133, 216, 255, 0.18)", 0.34, 0.2);
+  // Game start ascending arpeggio
+  playUiTone(400, 0.07, "triangle", 0.04);
+  setTimeout(() => playUiTone(540, 0.07, "triangle", 0.04), 80);
+  setTimeout(() => playUiTone(720, 0.10, "triangle", 0.045), 160);
 }
 
 function toggleLanguage() {
@@ -2089,6 +2099,8 @@ function handleGateUnlockFeedback(gateWasClosed) {
   pushLog(langText("서비스 게이트가 열렸습니다. 탈출구에서 E를 3초 유지하세요!", "Service gate unlocked. Hold E at the gate for 3 seconds!"));
   pulseShake(2.1);
   playUiTone(760, 0.18, "triangle", 0.05);
+  playUiTone(960, 0.14, "triangle", 0.04);
+  playUiTone(1200, 0.10, "triangle", 0.03);
   showBanner(langText("게이트 해금", "Gate Unlocked"), langText("탈출구에서 E를 3초 유지하세요!", "Hold E at the gate for 3 seconds!"), "gold", 1.6);
   flashScreen("rgba(255, 211, 107, 0.24)", 0.48, 0.22);
   // Hunter rushes to exit intercept
@@ -2373,6 +2385,8 @@ function failRun(reason) {
   state.outcomeText = reason;
   pulseShake(3.2);
   playUiTone(120, 0.5, "sawtooth", 0.05);
+  playUiTone(850, 0.12, "sine", 0.06);
+  playUiTone(320, 0.1, "sawtooth", 0.03);
   showBanner(langText("런 실패", "Run Failed"), reason, "crimson", 2.2);
   flashScreen("rgba(255, 72, 118, 0.28)", 0.55, 0.28);
 }
@@ -2419,6 +2433,7 @@ function update(dt) {
   updatePlayer(dt);
   updateCamera();
   updateEconomy(dt);
+  updateFloatTexts(dt);
   updateBlackout(dt);
   updateMutation(dt);
   updateAnomaly(dt);
@@ -2523,6 +2538,34 @@ function getRoomTrait(room) {
   return ROOM_TRAITS.find((t) => t.id === room.trait) || null;
 }
 
+function updateFloatTexts(dt) {
+  for (let i = game.floatTexts.length - 1; i >= 0; i--) {
+    const f = game.floatTexts[i];
+    f.age += dt;
+    f.y += f.vy * dt;
+    f.vy *= 0.88;
+    if (f.age >= f.maxAge) game.floatTexts.splice(i, 1);
+  }
+}
+
+function drawFloatTexts() {
+  for (const f of game.floatTexts) {
+    const alpha = clamp(1 - f.age / f.maxAge, 0, 1);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.font = "700 13px 'Avenir Next Condensed', 'BIZ UDPGothic', sans-serif";
+    ctx.fillStyle = "#ffd84a";
+    ctx.shadowColor = "rgba(255, 200, 0, 0.6)";
+    ctx.shadowBlur = 6;
+    ctx.fillText(f.text, f.x - ctx.measureText(f.text).width / 2, f.y);
+    ctx.restore();
+  }
+}
+
+function spawnGoldFloat(x, y, amount) {
+  game.floatTexts.push({ x, y, vy: -28, text: `+${Math.round(amount)}`, age: 0, maxAge: 1.4 });
+}
+
 function updateEconomy(dt) {
   const ownedRoom = getOwnedRoom();
   if (!ownedRoom || ownedRoom.floor !== game.player.floor) {
@@ -2534,7 +2577,17 @@ function updateEconomy(dt) {
   const traitGoldMult = trait?.effect.goldMult || 1;
 
   if (pointInRect(game.player.x, game.player.y, ownedRoom)) {
-    addGold(CONFIG.economy.goldPerSecondInRoom * game.runProfile.modifiers.goldGainMultiplier * traitGoldMult * wardGoldMult * dt);
+    const income = CONFIG.economy.goldPerSecondInRoom * game.runProfile.modifiers.goldGainMultiplier * traitGoldMult * wardGoldMult;
+    addGold(income * dt);
+    game._goldFloatTimer = (game._goldFloatTimer || 0) - dt;
+    if (game._goldFloatTimer <= 0) {
+      const onBed = distance(game.player, ownedRoom.bed) < 34;
+      const total = income + (onBed ? CONFIG.economy.goldPerSecondOnBedBonus * game.runProfile.modifiers.goldGainMultiplier * traitGoldMult * wardGoldMult : 0);
+      spawnGoldFloat(ownedRoom.bed.x + randomRange(-8, 8), ownedRoom.bed.y - 16, total * 1.5);
+      game._goldFloatTimer = 1.5;
+    }
+  } else {
+    game._goldFloatTimer = 0;
   }
 
   if (distance(game.player, ownedRoom.bed) < 34) {
@@ -2684,6 +2737,7 @@ function updateMutation(dt) {
     pushLog(langText("방이 찢어졌습니다. 무언가 옆길을 찾았습니다.", "The room split open. Something found a side path."));
     pulseShake(1.6);
     playUiTone(150, 0.22, "sawtooth", 0.04);
+    playUiTone(380, 0.14, "square", 0.045);
   }
 
   if (ownedRoom.breach) {
@@ -2761,6 +2815,9 @@ function updateUnits(dt) {
   game.infected = game.infected.filter((enemy) => enemy.hp > 0);
   if (game.hunter.hp <= 0) {
     game.hunter.hp = hunterMaxHp();
+    game.hunter.charging = false;
+    game.hunter.chargeTimer = 0;
+    game.hunter.attackCooldown = 1.5;
     const respawnPoint = floorSpawnPoint(game.hunter.floor);
     game.hunter.x = respawnPoint.x;
     game.hunter.y = respawnPoint.y;
@@ -2777,7 +2834,7 @@ function updateHunter(dt) {
     moveEntityWithPath(hunter, hunter.targetX, hunter.targetY, CONFIG.hunter.baseSpeed * 0.4 * dt);
     return;
   }
-  hunter.level = 1 + Math.floor(game.time / 55) + Math.floor(game.fragments / 2) + countBreaches();
+  hunter.level = Math.min(20, 1 + Math.floor(game.time / 55) + Math.floor(game.fragments / 2) + countBreaches());
 
   // Announce hunter phase milestones
   if (hunter.level === 3 && !hunter._announcedL3) {
@@ -2799,7 +2856,7 @@ function updateHunter(dt) {
 
   // Level 5+: occasionally force a breach on the player's room
   if (hunter.level >= 5) {
-    hunter._breachAttemptTimer = (hunter._breachAttemptTimer || randomRange(35, 55)) - dt;
+    hunter._breachAttemptTimer -= dt;
     if (hunter._breachAttemptTimer <= 0) {
       hunter._breachAttemptTimer = randomRange(35, 55);
       const ownedRoom = getOwnedRoom();
@@ -2808,6 +2865,7 @@ function updateHunter(dt) {
         pushLog(langText("술래가 벽을 뚫었습니다!", "The hunter forced a breach!"));
         pulseShake(2.0);
         playUiTone(140, 0.22, "sawtooth", 0.05);
+        playUiTone(380, 0.14, "square", 0.045);
         spawnImpact(ownedRoom.x + ownedRoom.w - 24, ownedRoom.y + ownedRoom.h / 2, "crimson", 1.4, 14);
       }
     }
@@ -3941,6 +3999,7 @@ function draw() {
   drawUnits();
   drawActors();
   drawDoors();
+  drawFloatTexts();
   drawEffects();
   ctx.restore();
   drawThreatOverlay();
@@ -4088,8 +4147,14 @@ function drawZones() {
     }
 
     if (room.breach) {
-      ctx.fillStyle = "rgba(255, 92, 132, 0.34)";
-      ctx.fillRect(room.x + room.w - 12, room.y + room.h / 2 - 30, 12, 60);
+      const breachPulse = 0.3 + Math.abs(Math.sin(game.time * 6.5)) * 0.45;
+      ctx.save();
+      ctx.shadowColor = "#ff3060";
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = `rgba(255, 60, 100, ${breachPulse})`;
+      ctx.fillRect(room.x + room.w - 12, room.y + room.h / 2 - 32, 12, 64);
+      ctx.shadowBlur = 0;
+      ctx.restore();
     }
 
     // 방 이름: 더 크고 배경 칩과 함께
@@ -4480,6 +4545,34 @@ function drawDoors() {
       ctx.fillRect(room.door.x, room.door.y - 10, room.door.w * hpPct, 4);
     }
     ctx.restore();
+
+    // Door thorns: golden shimmer overlay
+    if (room.door.thorns && room.door.closed) {
+      const shimmer = 0.18 + Math.abs(Math.sin(game.time * 3.4 + room.door.centerX * 0.05)) * 0.18;
+      ctx.save();
+      ctx.globalAlpha = shimmer;
+      ctx.fillStyle = "#ffd84a";
+      ctx.fillRect(room.door.x, room.door.y, room.door.w, room.door.h);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = `rgba(255, 215, 60, ${0.55 + shimmer})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(room.door.x - 1, room.door.y - 1, room.door.w + 2, room.door.h + 2);
+      ctx.restore();
+    }
+
+    // Door curse: pulsing crimson aura
+    if (room.door.curse && room.door.closed) {
+      const pulse = 0.25 + Math.abs(Math.sin(game.time * 4.5 + room.door.centerX * 0.04)) * 0.28;
+      ctx.save();
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = "#8b0026";
+      ctx.fillRect(room.door.x - 3, room.door.y - 3, room.door.w + 6, room.door.h + 6);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = `rgba(220, 40, 80, ${0.5 + pulse * 0.6})`;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(room.door.x - 2, room.door.y - 2, room.door.w + 4, room.door.h + 4);
+      ctx.restore();
+    }
   }
 
   if (world.exitRoom.floor === game.player.floor) {
@@ -5311,7 +5404,7 @@ function renderHud(force = false) {
     [t("stat_contract"), formatContractStatus(), game.contract ? "gold" : ""],
     [t("stat_anomaly"), formatAnomalyStatus(), game.anomaly ? "danger" : ""],
     [t("stat_hunter"), localize(game.runProfile.hunter.label), "danger"],
-    [t("stat_admin"), state.adminMode ? (state.godMode ? "GOD" : "ON") : "OFF", state.adminMode ? "gold admin-active" : ""],
+    ...(state.adminMode ? [[t("stat_admin"), state.godMode ? "GOD" : "ON", "gold admin-active"]] : []),
   ];
 
   const statsHtml = `
