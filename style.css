@@ -6,7 +6,7 @@
   --line: rgba(141, 198, 255, 0.22);
   --line-hot: rgba(255, 107, 138, 0.34);
   --text: #f3f6ff;
-  --muted: #9aa8c6;
+  --muted: #b8c6e0;
   --accent: #85d8ff;
   --accent-2: #ff6f95;
   --gold: #ffd46d;
@@ -124,6 +124,20 @@ body::after {
   justify-content: flex-end;
 }
 
+.header-actions button {
+  padding: 9px 13px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+#restartButton {
+  border-color: rgba(255, 107, 138, 0.38);
+}
+
+#pauseButton {
+  border-color: rgba(255, 212, 109, 0.28);
+}
+
 .theme-chip {
   padding: 9px 12px;
   font-size: 11px;
@@ -154,7 +168,11 @@ body::after {
 
 .low-fx .viewport::after,
 .low-fx body::before {
-  opacity: 0.12;
+  display: none;
+}
+
+.low-fx body::after {
+  display: none;
 }
 
 .low-fx .overlay-card,
@@ -197,6 +215,11 @@ button:hover {
 button:active {
   transform: translateY(0) scale(0.97);
   transition: transform 80ms ease;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .layout {
@@ -271,10 +294,12 @@ button:active {
 
 .hud-panel h2 {
   margin: 0 0 10px;
+  padding-bottom: 8px;
   font-size: 11px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--accent);
+  border-bottom: 1px solid rgba(133, 216, 255, 0.14);
 }
 
 .viewport::before {
@@ -374,6 +399,28 @@ button:active {
   max-width: 44ch;
 }
 
+#startButton {
+  background:
+    linear-gradient(180deg, rgba(133, 216, 255, 0.28), rgba(81, 143, 255, 0.18)),
+    rgba(14, 20, 36, 0.96);
+  border-color: rgba(133, 216, 255, 0.45);
+  color: #e8f6ff;
+  font-size: 15px;
+  padding: 13px 28px;
+  letter-spacing: 0.14em;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.36),
+    0 0 28px rgba(133, 216, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+#startButton:hover {
+  border-color: rgba(133, 216, 255, 0.72);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(133, 216, 255, 0.26);
+}
+
 .stage canvas {
   width: 100%;
   height: 100%;
@@ -410,10 +457,10 @@ button:active {
 .mobile-dock {
   position: absolute;
   right: 18px;
-  bottom: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   z-index: 4;
   display: none;
-  gap: 10px;
+  gap: 14px;
   flex-wrap: wrap;
   justify-content: flex-end;
   max-width: min(420px, calc(100% - 40px));
@@ -422,7 +469,7 @@ button:active {
 .mobile-stick {
   position: absolute;
   left: 20px;
-  bottom: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   z-index: 4;
   display: none;
   width: 132px;
@@ -563,21 +610,23 @@ button:active {
 .overlay-card h2,
 .panel h2 {
   margin: 0 0 10px;
-  font-size: 12px;
+  padding-bottom: 8px;
+  font-size: 11px;
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--accent);
+  border-bottom: 1px solid rgba(133, 216, 255, 0.12);
 }
 
 .overlay-card p {
   margin: 8px 0;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 #objectiveText {
   display: grid;
   gap: 6px;
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.4;
   color: var(--text);
   font-weight: 700;
@@ -816,18 +865,27 @@ button:active {
 
 .stats .stat-card span {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   color: var(--muted);
-  font-size: 10px;
-  letter-spacing: 0.18em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .stats .stat-card strong {
   display: block;
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1;
   color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.stats .stat-card strong.danger {
+  color: var(--danger);
+}
+
+.stats .stat-card strong.gold {
+  color: var(--gold);
 }
 
 .stats .stats-secondary {
@@ -839,29 +897,76 @@ button:active {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 7px 10px 7px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 2px solid rgba(133, 216, 255, 0.28);
+}
+
+.stats .stat-chip.chip-danger {
+  border-left-color: rgba(255, 122, 122, 0.55);
+  background: rgba(255, 80, 80, 0.04);
+}
+
+.stats .stat-chip.chip-gold {
+  border-left-color: rgba(255, 212, 109, 0.45);
+  background: rgba(255, 212, 80, 0.04);
 }
 
 .stats .stat-chip span {
   color: var(--muted);
-  font-size: 10px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .stats .stat-chip strong {
   font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.stats .stat-chip strong.danger {
+  color: var(--danger);
+}
+
+.stats .stat-chip strong.gold {
+  color: var(--gold);
+}
+
+/* ── HP bar ──────────────────────────────────────────────── */
+.hp-bar-track {
+  margin-top: 7px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hp-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.6s ease;
 }
 
 .hud-panel-log .log-entry {
   grid-template-columns: 44px minmax(0, 1fr);
   padding: 6px 0;
+  animation: log-in 200ms ease both;
 }
 
 .hud-panel-log .log-entry:nth-child(n + 6) {
   display: none;
+}
+
+@keyframes log-in {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes panel-rise {
@@ -957,7 +1062,7 @@ button:active {
   .quick-help {
     right: 18px;
     top: auto;
-    bottom: 188px;
+    bottom: calc(200px + env(safe-area-inset-bottom, 0px));
     width: min(250px, calc(100% - 36px));
   }
 
@@ -971,7 +1076,7 @@ button:active {
 
   .overlay-card {
     width: min(520px, calc(100% - 44px));
-    bottom: 112px;
+    bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -1037,15 +1142,15 @@ button:active {
 
   .mobile-stick {
     left: 12px;
-    bottom: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     width: 118px;
     height: 118px;
   }
 
   .mobile-dock {
     right: 12px;
-    bottom: 14px;
-    gap: 8px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
     max-width: 180px;
   }
 
@@ -1135,7 +1240,7 @@ button:active {
 }
 
 .guide-modal {
-  width: min(860px, 100%);
+  width: min(860px, 90vw);
   max-height: 90vh;
   display: flex;
   flex-direction: column;
